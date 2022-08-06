@@ -1,0 +1,100 @@
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+}
+
+#game-tab {
+  height: 100%;
+}
+
+#top {
+  height: 100%;
+}
+
+#left-bar {
+  width: 300px;
+  flex-shrink: 0;
+  font-family: "Arial";
+  font-size: 20;
+}
+
+.info {
+  margin: 4px 5px;
+}
+
+#button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin: 0px;
+}
+
+button {
+  font-family: "Arial";
+  margin: 5px;
+  height: 30px;
+}
+
+#gallery {
+  /* height: 300px; */
+  /* width: 300px; */
+  overflow-y: scroll;
+  border-color: lightgray;
+  border-width: 1px;
+  border-style: solid;
+  font-family: "Segoe UI", Verdana, Helvetica, Sans-Serif;
+  font-size: 16;
+  cursor: pointer;
+  margin: 10px 5px;
+}
+
+.disabled {
+  color: lightgray;
+}
+
+#gallery>div:not(.disabled):hover {
+  background-color: lightgray;
+}
+
+#mat {
+  border-width: 1;
+  border-style: solid;
+  overflow: clip;
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+
+.dot {
+  height: 25px;
+  width: 25px;
+  background-color: azure;
+  border-radius: 50%;
+  display: block;
+  position: fixed;
+  text-align: center;
+  padding: 6px 3px 0px 3px;
+  z-index: 1;
+}
+
+.row {
+  display: flex;
+}
+
+.hide {
+  display: none;
+}
+
+#help {
+  position: fixed;
+  background-color: rgba(220, 220, 220, 1.0);
+  border-width: 1px;
+  border-style: solid;
+  padding: 10px;
+  top: 50px;
+  left: 30px;
+  width: 500px;
+  height: 500px;
+  z-index: 2;
+}

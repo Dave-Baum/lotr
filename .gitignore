@@ -1,6 +1,5 @@
 node_modules
 tools/dist
-app/dist
 app/build
 cache
 .vscode
