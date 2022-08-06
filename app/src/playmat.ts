@@ -9,8 +9,8 @@ const PLAY_FIRST_X = 20;
 const PLAY_FIRST_Y = 10;
 const PLAY_DELTA_X = 20;
 const PLAY_DELTA_Y = 10;
-const QUEST_X = 600;
-const QUEST_Y = 680;
+const QUEST_X = 840;
+const QUEST_Y = 10;
 const COUNTER_RADIUS = 20;
 const COUNTER_PAD = 5;
 const SELECT_COLOR = '#f5f5d7';
@@ -18,7 +18,7 @@ const COUNTER_COLOR = '#caedcd';
 const COUNTER_FONT = '20px Arial';
 const ENCOUNTER_IMAGE = 'encounter.webp';
 
-const ZOOMED_RATE = 0.003;
+const ZOOMED_RATE = 0.004;
 const ZOOMED_MAX_SCALE = 0.5;
 
 export enum Order {
@@ -209,7 +209,7 @@ export class Playmat {
   }
 
   isEncounterSelected(): boolean {
-    return !!(this.selectedPiece && this.selectedPiece.discardId);
+    return !!(this.selectedPiece && this.selectedPiece.discardId());
   }
 
   setQuest(questIds: string[]): void {

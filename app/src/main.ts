@@ -22,6 +22,16 @@ const playmat = new Playmat(mat);
 
 console.log('Running main.ts');
 
+function adjustMatSize() {
+  const bounds = mat.getBoundingClientRect();
+  mat.width = bounds.width;
+  mat.height = bounds.height;
+  playmat.update(true);
+}
+
+addEventListener('resize', adjustMatSize);
+setTimeout(adjustMatSize);
+
 function getElement(id: string): Element {
   return assertValid(document.getElementById(id));
 }
@@ -102,11 +112,9 @@ function updateGallery(): void {
   for (const child of gallery.childNodes) {
     const el = child as HTMLElement;
     const count = deck.getCount(assertValid(el.dataset['cardId']));
-    console.log(count);
     if (count) {
       el.classList.remove('disabled');
     } else {
-      console.log('hiding');
       el.classList.add('disabled');
     }
   }
