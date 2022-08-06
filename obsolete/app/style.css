@@ -1,0 +1,113 @@
+#container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  /* border-style: solid; */
+  /* background-color: beige; */
+  margin: 10px;
+  transition: transform 0.4s;
+}
+
+.card:hover {
+  transform: scale(1.3);
+}
+
+.card-image {
+  width: 200px;
+}
+
+.select {
+  border-style: solid;
+  border-color: lemonchiffon;
+  border-width: 5px;
+  margin: 5px;
+}
+
+.card-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 10px;
+}
+
+#gallery {
+  height: 300px;
+  /* width: 300px; */
+  overflow-y: scroll;
+  border-color: lightgray;
+  border-width: 1px;
+  border-style: solid;
+  font-family: "Segoe UI", Verdana, Helvetica, Sans-Serif;
+  font-size: 16;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#gallery>div:hover {
+  background-color: lightgray;
+}
+
+#quest {
+  height: 200px;
+  transition: transform 0.4s;
+}
+
+#quest:hover {
+  transform: scale(1.3) translate(20%, 20%);
+}
+
+
+#areas {
+  display: grid;
+  grid-template-columns: auto 240px;
+  grid-template-rows: 310px 310px;
+}
+
+#staging {
+  border-style: dashed;
+  background-color: lightblue;
+  display: flex;
+  flex-grow: 1;
+}
+
+.engaged {
+  border-style: dashed;
+  background-color: crimson;
+  display: flex;
+  flex-grow: 1;
+}
+
+#location {
+  border-style: dashed;
+  background-color: darkseagreen;
+  display: flex;
+  width: 240px;
+  height: 300px;
+}
+
+#popup {
+  position: absolute;
+  z-index: 1;
+}
+
+
+.dot {
+  height: 25px;
+  width: 25px;
+  background-color: azure;
+  border-radius: 50%;
+  display: block;
+  position: fixed;
+  text-align: center;
+  padding: 6px 3px 0px 3px;
+  z-index: 1;
+}
+
+.row {
+  display: flex;
+}

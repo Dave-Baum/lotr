@@ -1,0 +1,91 @@
+// HTML
+  <div id="popup" class="popup-content">
+    <p>Engage</p>
+    <p>Discard</p>
+    <p>Travel</p>
+  </div>
+
+
+// CSS
+/* Popup Content (Hidden by Default) */
+.popup-content {
+  display: none;
+  position: absolute;
+  background-color: #f1f1f1;
+  min-width: 100px;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+/* Links inside the popup */
+.popup-content p {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: small;
+  color: black;
+  padding: 10px 16px;
+  margin: 0px;
+  text-decoration: none;
+  display: block;
+}
+
+/* Change color of popup links on hover */
+.popup-content p:hover {
+  background-color: #ddd
+}
+
+/* Show the popup menu */
+.show {
+  display: block;
+}
+
+// TS
+
+popup.addEventListener('click', (event: MouseEvent) => {
+  console.log('popup clicked', event.target);
+  popup.classList.remove('show');
+});
+
+function activatePopup(event: MouseEvent, callback: () => void) {
+  popup.style.left = `${event.pageX}px`;
+  popup.style.top = `${event.pageY}px`;
+  popup.classList.add('show');
+  // callback();
+}
+
+
+    /*
+    function showPopup() {
+      console.log('showPopup');
+      let value = assertValid(document.getElementById('popupItem'));
+      value.classList.toggle('display');
+    }
+    */
+
+
+function playClicked(event: MouseEvent) {
+  console.log('playClicked');
+  const box = assertValid(document.getElementById('box'));
+  box.style.left = `${event.offsetX}px`;
+  box.style.top = `${event.offsetY}px`;
+  box.classList.add('show');
+}
+_global.playClicked = playClicked;
+
+
+
+// Close the dropdown menu if the user clicks outside of it
+/*
+window.onclick = function(event) {
+  console.log('target', event.target);
+  if (!event.target?.matches('.dropbtn')) {
+    var dropdowns = document.getElementsByClassName('dropdown-content');
+    var i;
+    for (i = 0; i < dropdowns.length; i++) {
+      var openDropdown = dropdowns[i];
+      if (openDropdown.classList.contains('show')) {
+        // openDropdown.classList.remove('show');
+      }
+    }
+  }
+}
+*/

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>Example</title>
+  <link rel="stylesheet" href="style.css" />
+  <!--
+  <script type="text/javascript" src="data.js" defer></script>
+  <script type="module" src="./main.js" defer></script>
+  -->
+  <script src="require.js"></script>
+  <script src="main.js"></script>
+  <script>
+    // same as data-main
+    // require.config({baseUrl: 'js'});
+    require(['app/src/main']);
+  </script>
+</head>
+
+<body>
+  <canvas id="area" width="800px" height="600px" tabindex="1">
+  </canvas>
+  <div class "row">
+    <img id="quest" />
+  </div>
+  <div class="row">
+    <div id="staging"></div>
+    <div id="gallery"></div>
+  </div>
+
+  <div class="row">
+    <div id="engaged1" class="engaged"></div>
+    <div id="location"></div>
+    <div id="engaged2" class="engaged"></div>
+  </div>
+  <div id="areas">
+    <!--
+      <span class="dot">4</span>
+      -->
+  </div>
+  </div>
+</body>
+
+</html>
