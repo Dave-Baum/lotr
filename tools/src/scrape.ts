@@ -9,6 +9,17 @@ import {Database} from './database';
 const HOST = 'hallofbeorn.com';
 const CACHE_DIR = 'cache';
 
+// Set codes that cannot be inferred from the URL suffix
+const SET_CODES = new Map<string, string>([
+  ['Into Fangorn Nightmare', 'IFN'],
+  ['The Drowned Ruins Nightmare', 'TDRuN'],
+  ['The Battle of Five Armies Nightmare', 'TBoFAN'],
+]);
+
+const CARD_NUMBER_OVERRIDES = new Map<string, number>([
+  ['The Champion\'s Cunning', 74],
+]);
+
 async function fetchHTTP(path: string): Promise<string> {
   const options = {
     hostname: HOST,
@@ -71,12 +82,19 @@ async function getCard(database: Database, path: string): Promise<Card> {
   const $ = cheerio.load(await fetch(path));
   const titleNameBox = $('.titleNameBox').first();
   const name = $('div', titleNameBox).first().text();
+  const setName = $('span', titleNameBox).first().text().trim();
   const ident = $('span', titleNameBox).last().text();
   const images = $('.card-image');
   const cardImage = assertValid(images.get(0));
   const cardImageB = images.get(1);
-  const set = assertValid(path.match(/.*-([^-]+)$/))[1];
-  const cardNumber = Number(assertValid(ident.match(/#(\d+)/))[1]);
+  let set = SET_CODES.get(setName);
+  if (!set) {
+    set = assertValid(path.match(/.*-([^-]+)$/))[1];
+  }
+  let cardNumber = CARD_NUMBER_OVERRIDES.get(name);
+  if (!cardNumber) {
+    cardNumber = Number(assertValid(ident.match(/#(\d+)/))[1]);
+  }
   const id = `${set}-${cardNumber}`;
 
   card = {
@@ -86,10 +104,10 @@ async function getCard(database: Database, path: string): Promise<Card> {
     page: path,
     image: assertValid(getAttribute(cardImage, 'src')),
   };
+
   if (cardImageB) {
     card.imageB = assertValid(getAttribute(cardImageB, 'src'));
   }
-
   database.addCard(card);
   return Promise.resolve(card);
 }
@@ -185,16 +203,10 @@ async function getCampaigns(): Promise<Campaign[]> {
   return Promise.resolve(campaigns);
 }
 
-const SCENARIOS = [
-  'Passage-Through-Mirkwood',
-  'Into-the-Pit',
-  'The-Seventh-Level',
-];
-
 async function main() {
   try {
     const database = new Database();
-    const campaigns = (await getCampaigns()).slice(0, 5);
+    const campaigns = (await getCampaigns()).slice(0, 21);
     for (const c of campaigns) {
       database.addCampaign(c);
       for (const s of c.scenarios) {

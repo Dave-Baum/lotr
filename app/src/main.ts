@@ -22,6 +22,7 @@ const playmat = new Playmat(mat);
 
 console.log('Running main.ts');
 
+
 function adjustMatSize() {
   const bounds = mat.getBoundingClientRect();
   mat.width = bounds.width;
@@ -36,16 +37,35 @@ function getElement(id: string): Element {
   return assertValid(document.getElementById(id));
 }
 
+function setupCollapsibles() {
+  for (const c of document.getElementsByClassName('collapsible')) {
+    c.addEventListener('click', () => {
+      c.classList.toggle('active');
+      const content = assertValid(c.nextElementSibling) as HTMLElement;
+      if (content.style.display === 'block') {
+        content.style.display = 'none';
+      } else {
+        content.style.display = 'block';
+      }
+    });
+  }
+}
+
+
 function buildScenarioPicker(): void {
-  const choices = [];
+  const parts = [];
   for (const campaign of CAMPAIGNS.values()) {
-    choices.push(`<h3>${campaign.name}</h3>`);
+    parts.push(`<div class="collapsible">${campaign.name}</div>`);
+    parts.push('<div class="content">');
     for (const id of campaign.scenarios) {
       const scenario = getScenario(id);
-      choices.push(`<div><a href="#${scenario.id}">${scenario.name}</a></div>`);
+      parts.push(`<div class="scenario"><a href="#${scenario.id}">${
+          scenario.name}</a></div>`);
     }
+    parts.push('</div>');
   }
-  getElement('scenario-list').innerHTML = choices.join('\n');
+  getElement('scenario-list').innerHTML = parts.join('\n');
+  setupCollapsibles();
 }
 
 function update() {

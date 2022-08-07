@@ -41,6 +41,10 @@ export class Database {
   }
 
   addCard(card: Card): void {
+    if (this.cards.get(card.id)) {
+      console.log(`Warning: duplicate card id ${card.id}`);
+      return;
+    }
     this.cards.set(card.id, card);
     this.cardForPage.set(card.page, card);
   }
