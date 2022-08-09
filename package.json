@@ -12,6 +12,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/jasmine": "^3.6.0",
+    "@types/resize-observer-browser": "^0.1.7",
     "jasmine": "^3.6.0"
   },
   "dependencies": {

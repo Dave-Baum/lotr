@@ -1,11 +1,7 @@
+import {Destination} from './commands';
+
 function randomInt(max: number): number {
   return Math.floor(Math.random() * max);
-}
-
-export enum DeckPosition {
-  TOP,
-  BOTTOM,
-  DISCARD,
 }
 
 export class Deck {
@@ -29,18 +25,18 @@ export class Deck {
     return this.counts.get(id) || 0;
   }
 
-  add(id: string, position: DeckPosition, count = 1): void {
+  add(id: string, destination: Destination, count = 1): void {
     this.modified = true;
     this.adjustCount(id, count);
     while (count--) {
-      switch (position) {
-        case DeckPosition.TOP:
+      switch (destination) {
+        case 'top':
           this.drawPile.push(id);
           break;
-        case DeckPosition.BOTTOM:
+        case 'bottom':
           this.drawPile.unshift(id);
           break;
-        case DeckPosition.DISCARD:
+        case 'discard':
           this.discardPile.push(id);
           break;
       }

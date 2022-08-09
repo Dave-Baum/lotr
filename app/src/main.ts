@@ -1,8 +1,10 @@
+import {RenameLocation} from 'typescript';
+import {Adjustment, Command, Destination} from './commands';
 import {assertValid} from './common/util';
-import {CAMPAIGNS, CARDS, getScenario, SCENARIOS} from './database';
-import {Deck, DeckPosition} from './deck';
+import {CAMPAIGNS, CARDS, getScenario} from './database';
+import {Deck} from './deck';
 import {imageCache} from './image_cache';
-import {Order, Playmat} from './playmat';
+import {Playmat} from './playmat';
 
 const gallery = getElement('gallery');
 const help = getElement('help');
@@ -23,16 +25,19 @@ const playmat = new Playmat(mat);
 
 console.log('Running main.ts');
 
-
 function adjustMatSize() {
   const bounds = mat.getBoundingClientRect();
+  console.log('adjustMatSize', bounds);
   mat.width = bounds.width;
   mat.height = bounds.height;
   playmat.update(true);
 }
 
-addEventListener('resize', adjustMatSize);
-setTimeout(adjustMatSize);
+const resizeObserver = new ResizeObserver(entries => {
+  adjustMatSize();
+});
+resizeObserver.observe(mat);
+
 
 function getElement(id: string): Element {
   return assertValid(document.getElementById(id));
@@ -69,7 +74,7 @@ function buildScenarioPicker(): void {
   for (const s of document.getElementsByClassName('scenario')) {
     const el = s as HTMLElement;
     el.addEventListener('click', () => {
-      window.location.href = '#' + assertValid(el.dataset['sid']);
+      switchToScenario(assertValid(el.dataset['sid']));
     });
   }
 }
@@ -88,6 +93,7 @@ function update() {
 }
 
 imageCache.setLoadDoneCallback(() => {
+  console.log('image loading complete');
   playmat.update(true);
 });
 
@@ -118,13 +124,11 @@ refreshButton.addEventListener('click', () => {
 });
 
 putTopButton.addEventListener('click', () => {
-  playmat.returnToDeck(deck, DeckPosition.TOP);
-  update();
+  removeCard('top');
 });
 
 putBottomButton.addEventListener('click', () => {
-  playmat.returnToDeck(deck, DeckPosition.BOTTOM);
-  update();
+  removeCard('bottom');
 });
 
 showDiscardButton.addEventListener('click', () => {
@@ -172,7 +176,7 @@ function provideCards(scenarioId: string): void {
   const sortedCards = [];
   for (const [id, count] of Object.entries(scenario.encounters)) {
     sortedCards.push(assertValid(CARDS.get(id)));
-    deck.add(id, DeckPosition.TOP, count);
+    deck.add(id, 'top', count);
   }
   deck.shuffle();
 
@@ -197,35 +201,73 @@ function provideCards(scenarioId: string): void {
   playmat.setQuest(scenario.quests);
 }
 
+function handleCommand(command: Command): void {
+  console.log(command);
+  switch (command.kind) {
+    case 'adjust':
+      playmat.adjustCard(command.uid, command.adjustment, command.amount);
+      break;
+    case 'remove':
+      const id = playmat.removeCard(command.uid);
+      if (id) {
+        deck.add(id, command.destination);
+      }
+      break;
+    default:
+      throw new Error(`invalid command: ${command}`);
+  }
+  update();
+}
+
+function queueCommand(command: Command): void {
+  handleCommand(command);
+}
+
+function adjustCard(adjustment: Adjustment, amount: number): void {
+  const uid = playmat.selectedUid();
+  if (uid) {
+    queueCommand({kind: 'adjust', uid, adjustment, amount});
+  }
+}
+
+function removeCard(destination: Destination): void {
+  const uid = playmat.selectedUid();
+  if (uid) {
+    queueCommand({kind: 'remove', uid, destination});
+  }
+}
+
 document.addEventListener('keydown', event => {
   playmat.setShiftKey(event.shiftKey);
-  if (!event.repeat) {
-    switch (event.key) {
-      case 'Backspace':
-        playmat.returnToDeck(deck, DeckPosition.DISCARD);
-        break;
-      case '[':
-        playmat.changeOrder(Order.BOTTOM);
-        break;
-      case ']':
-        playmat.changeOrder(Order.TOP);
-        break;
-      case '=':
-        playmat.adjustCounter(1);
-        break;
-      case '-':
-        playmat.adjustCounter(-1);
-        break;
-      case '.':
-      case ' ':
-        playmat.adjustPhase(1);
-        break;
-      case ',':
-        playmat.adjustPhase(-1);
-        break;
-      default:
-        break;
-    }
+  if (event.repeat) {
+    return;
+  }
+  const uid = playmat.selectedUid();
+  switch (event.key) {
+    case 'Backspace':
+      removeCard('discard');
+      break;
+    case '[':
+      adjustCard('order', -1);
+      break;
+    case ']':
+      adjustCard('order', 1);
+      break;
+    case '=':
+      adjustCard('counter', 1);
+      break;
+    case '-':
+      adjustCard('counter', -1);
+      break;
+    case '.':
+    case ' ':
+      adjustCard('phase', 1);
+      break;
+    case ',':
+      adjustCard('phase', -1);
+      break;
+    default:
+      break;
   }
   update();
 });
@@ -243,18 +285,30 @@ function startScenario(id: string): void {
 }
 
 function routeToPage(): void {
-  const hash = window.location.hash;
-  if (hash) {
+  const params = new URLSearchParams(window.location.search);
+  const scenario = decodeURIComponent(params.get('scenario') || '');
+  if (scenario) {
     getElement('scenario-tab').classList.add('hide');
     getElement('game-tab').classList.remove('hide');
-    startScenario(decodeURIComponent(hash.slice(1)));
+    startScenario(scenario);
   } else {
     getElement('scenario-tab').classList.remove('hide');
     getElement('game-tab').classList.add('hide');
   }
 }
 
+function switchToScenario(scenario: string): void {
+  // TODO: why does this need a cast to any?
+  const url = new URL(window.location as any);
+  url.searchParams.set('scenario', scenario);
+  window.history.pushState({}, '', url.toString());
+  routeToPage();
+}
+
+addEventListener('popstate', e => {
+  routeToPage();
+});
+
 buildScenarioPicker();
 
-window.onhashchange = routeToPage;
 routeToPage();
