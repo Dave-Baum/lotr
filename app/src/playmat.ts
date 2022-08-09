@@ -1,6 +1,6 @@
+import {Adjustment} from 'commands';
 import {assertValid} from './common/util';
 import {getCard} from './database';
-import {Deck, DeckPosition} from './deck';
 import {imageCache} from './image_cache';
 
 const CARD_WIDTH = 240;
@@ -21,10 +21,7 @@ const ENCOUNTER_IMAGE = 'encounter.webp';
 const ZOOMED_RATE = 0.004;
 const ZOOMED_MAX_SCALE = 0.5;
 
-export enum Order {
-  BOTTOM,
-  TOP,
-}
+let nextUid = 1;
 
 abstract class Piece {
   private counter = 0;
@@ -35,8 +32,8 @@ abstract class Piece {
   private zoomDirection = 0;
 
   constructor(
-      private readonly images: HTMLImageElement[], public x: number,
-      public y: number, private readonly width: number,
+      readonly uid: number, private readonly images: HTMLImageElement[],
+      public x: number, public y: number, private readonly width: number,
       private readonly height: number) {}
 
   abstract discardId(): string|null;
@@ -62,8 +59,6 @@ abstract class Piece {
   }
 
   draw(ctx: CanvasRenderingContext2D, selected: boolean): void {
-    // ctx.drawImage(
-    //    this.images[this.phase], this.x, this.y, this.width, this.height);
     this.drawImage(ctx);
     if (this.zoom) {
       return;
@@ -142,8 +137,9 @@ function getEncounterImages(id: string, faceDown: boolean) {
 
 class EncounterPiece extends Piece {
   constructor(
-      private readonly id: string, faceDown: boolean, x: number, y: number) {
-    super(getEncounterImages(id, faceDown), x, y, CARD_WIDTH, CARD_HEIGHT);
+      uid: number, private readonly id: string, faceDown: boolean, x: number,
+      y: number) {
+    super(uid, getEncounterImages(id, faceDown), x, y, CARD_WIDTH, CARD_HEIGHT);
   }
 
   discardId(): string|null {
@@ -152,14 +148,14 @@ class EncounterPiece extends Piece {
 }
 
 class QuestPiece extends Piece {
-  constructor(cardIds: string[], x: number, y: number) {
+  constructor(uid: number, cardIds: string[], x: number, y: number) {
     const images = [];
     for (const id of cardIds) {
       const card = getCard(id);
       images.push(imageCache.get(card.image));
       images.push(imageCache.get(assertValid(card.imageB)));
     }
-    super(images, x, y, CARD_HEIGHT, CARD_WIDTH);
+    super(uid, images, x, y, CARD_HEIGHT, CARD_WIDTH);
   }
 
   discardId(): string|null {
@@ -208,12 +204,74 @@ export class Playmat {
     this.playY = 0;
   }
 
+  selectedUid(): number|undefined {
+    return this.selectedPiece?.uid;
+  }
+
+  adjustCard(uid: number, adjustment: Adjustment, amount: number): void {
+    const piece = this.lookup(uid);
+    if (!piece) {
+      return;
+    }
+
+    switch (adjustment) {
+      case 'counter':
+        piece.adjustCounter(amount);
+        break;
+      case 'phase':
+        piece.adjustPhase(amount);
+        break;
+      case 'order':
+        const i = this.pieces.indexOf(piece);
+        this.pieces.splice(i, 1);
+        if (amount > 0) {
+          this.pieces.push(piece);
+        } else {
+          this.pieces.unshift(piece);
+        }
+        break;
+      default:
+        throw new Error(`invalid adjustment ${adjustment}`);
+    }
+    this.modified = true;
+    return;
+  }
+
+  removeCard(uid: number): string|undefined {
+    const piece = this.lookup(uid);
+    if (!piece) {
+      return;
+    }
+    const id = piece.discardId();
+    if (!id) {
+      return;
+    }
+    const i = this.pieces.indexOf(piece);
+    this.pieces.splice(i, 1);
+    if (this.selectedPiece === piece) {
+      this.selectedPiece =
+          this.pieces.length ? this.pieces[this.pieces.length - 1] : null;
+    }
+    this.modified = true;
+    return id;
+  }
+
+  private lookup(uid: number): Piece|undefined {
+    // TODO: use a map for faster uid lookup
+    for (const p of this.pieces) {
+      if (p.uid === uid) {
+        return p;
+      }
+    }
+    return;
+  }
+
   isEncounterSelected(): boolean {
     return !!(this.selectedPiece && this.selectedPiece.discardId());
   }
 
   setQuest(questIds: string[]): void {
-    this.pieces.push(new QuestPiece(questIds, QUEST_X, QUEST_Y));
+    this.pieces.push(new QuestPiece(nextUid++, questIds, QUEST_X, QUEST_Y));
     this.modified = true;
   }
 
@@ -225,7 +283,8 @@ export class Playmat {
       this.playX = PLAY_FIRST_X;
       this.playY = PLAY_FIRST_Y;
     }
-    const p = new EncounterPiece(id, faceDown, this.playX, this.playY);
+    const p =
+        new EncounterPiece(nextUid++, id, faceDown, this.playX, this.playY);
     if (faceDown) {
       this.pieces.unshift(p);
     } else {
@@ -239,6 +298,7 @@ export class Playmat {
     if (!this.modified && !force) {
       return;
     }
+    console.log('updating');
     const ctx = assertValid(this.canvas.getContext('2d'));
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const onTop = [];
@@ -263,52 +323,6 @@ export class Playmat {
     }
 
     this.modified = false;
-  }
-
-  returnToDeck(deck: Deck, position: DeckPosition): void {
-    if (!this.selectedPiece) {
-      return;
-    }
-    const id = this.selectedPiece.discardId();
-    if (!id) {
-      return;
-    }
-    const i = this.pieces.indexOf(this.selectedPiece);
-    this.pieces.splice(i, 1);
-    this.selectedPiece =
-        this.pieces.length ? this.pieces[this.pieces.length - 1] : null;
-    this.modified = true;
-    deck.add(id, position);
-  }
-
-  changeOrder(order: Order): void {
-    if (!this.selectedPiece) {
-      return;
-    }
-    const i = this.pieces.indexOf(this.selectedPiece);
-    this.pieces.splice(i, 1);
-    if (order === Order.TOP) {
-      this.pieces.push(this.selectedPiece);
-    } else {
-      this.pieces.unshift(this.selectedPiece);
-    }
-    this.modified = true;
-  }
-
-  adjustCounter(amount: number): void {
-    if (!this.selectedPiece) {
-      return;
-    }
-    this.selectedPiece.adjustCounter(amount);
-    this.modified = true;
-  }
-
-  adjustPhase(amount: number): void {
-    if (!this.selectedPiece) {
-      return;
-    }
-    this.selectedPiece.adjustPhase(amount);
-    this.modified = true;
   }
 
   private findPiece(x: number, y: number): Piece|null {
