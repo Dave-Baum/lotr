@@ -4,6 +4,7 @@ html {
 
 body {
   height: 100%;
+  margin: 0px;
 }
 
 /* Style the button that is used to open and close the collapsible content */
@@ -41,14 +42,6 @@ body {
   background-color: #ccc;
 }
 
-a {
-  display: block;
-}
-
-a:link {
-  text-decoration: none;
-}
-
 .collapsible:after {
   content: '\02795 ';
   /* Unicode character for "plus" sign (+) */
@@ -63,8 +56,6 @@ a:link {
   /* Unicode character for "minus" sign (-) */
 }
 
-
-
 #game-tab {
   height: 100%;
 }
@@ -78,6 +69,7 @@ a:link {
   flex-shrink: 0;
   font-family: "Arial";
   font-size: 20;
+  margin: 8px;
 }
 
 .info {
@@ -93,7 +85,7 @@ a:link {
 button {
   font-family: "Arial";
   margin: 5px;
-  height: 30px;
+  height: 40px;
 }
 
 #gallery {
@@ -118,7 +110,7 @@ button {
 }
 
 #mat {
-  border-width: 1;
+  border-width: 1px;
   border-style: solid;
   overflow: clip;
   flex-grow: 1;

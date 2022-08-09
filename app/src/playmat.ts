@@ -235,7 +235,7 @@ export class Playmat {
     this.modified = true;
   }
 
-  update(force = true): void {
+  update(force = false): void {
     if (!this.modified && !force) {
       return;
     }

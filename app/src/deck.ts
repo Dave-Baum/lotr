@@ -48,12 +48,20 @@ export class Deck {
   }
 
   reveal(): string|undefined {
+    return this.popFromPile(this.drawPile);
+  }
+
+  private popFromPile(pile: string[]) {
     this.modified = true;
-    const id = this.drawPile.pop();
+    const id = pile.pop();
     if (id) {
       this.adjustCount(id, 1);
     }
     return id;
+  }
+
+  popDiscard(): string|undefined {
+    return this.popFromPile(this.discardPile);
   }
 
   drawCount(): number {

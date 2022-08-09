@@ -13,7 +13,8 @@ const revealButton = getElement('reveal-button') as HTMLButtonElement;
 const shadowButton = getElement('shadow-button') as HTMLButtonElement;
 const shuffleButton = getElement('shuffle-button') as HTMLButtonElement;
 const refreshButton = getElement('refresh-button') as HTMLButtonElement;
-
+const showDiscardButton =
+    getElement('show-discard-button') as HTMLButtonElement;
 const putTopButton = getElement('put-top-button') as HTMLButtonElement;
 const putBottomButton = getElement('put-bottom-button') as HTMLButtonElement;
 
@@ -51,7 +52,6 @@ function setupCollapsibles() {
   }
 }
 
-
 function buildScenarioPicker(): void {
   const parts = [];
   for (const campaign of CAMPAIGNS.values()) {
@@ -59,13 +59,19 @@ function buildScenarioPicker(): void {
     parts.push('<div class="content">');
     for (const id of campaign.scenarios) {
       const scenario = getScenario(id);
-      parts.push(`<div class="scenario"><a href="#${scenario.id}">${
-          scenario.name}</a></div>`);
+      parts.push(`<div class="scenario" data-sid="${scenario.id}">${
+          scenario.name}</div>`);
     }
     parts.push('</div>');
   }
   getElement('scenario-list').innerHTML = parts.join('\n');
   setupCollapsibles();
+  for (const s of document.getElementsByClassName('scenario')) {
+    const el = s as HTMLElement;
+    el.addEventListener('click', () => {
+      window.location.href = '#' + assertValid(el.dataset['sid']);
+    });
+  }
 }
 
 function update() {
@@ -77,6 +83,7 @@ function update() {
   refreshButton.disabled = deck.drawCount() === 0 && deck.discardCount() === 0;
   putTopButton.disabled = !playmat.isEncounterSelected();
   putBottomButton.disabled = !playmat.isEncounterSelected();
+  showDiscardButton.disabled = deck.discardCount() === 0;
   playmat.update();
 }
 
@@ -117,6 +124,17 @@ putTopButton.addEventListener('click', () => {
 
 putBottomButton.addEventListener('click', () => {
   playmat.returnToDeck(deck, DeckPosition.BOTTOM);
+  update();
+});
+
+showDiscardButton.addEventListener('click', () => {
+  while (true) {
+    const id = deck.popDiscard();
+    if (!id) {
+      break;
+    }
+    playmat.play(id, false);
+  }
   update();
 });
 
@@ -229,7 +247,7 @@ function routeToPage(): void {
   if (hash) {
     getElement('scenario-tab').classList.add('hide');
     getElement('game-tab').classList.remove('hide');
-    startScenario(hash.slice(1));
+    startScenario(decodeURIComponent(hash.slice(1)));
   } else {
     getElement('scenario-tab').classList.remove('hide');
     getElement('game-tab').classList.add('hide');

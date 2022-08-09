@@ -22339,12 +22339,18 @@ define("app/src/deck", ["require", "exports"], function (require, exports) {
             }
         }
         reveal() {
+            return this.popFromPile(this.drawPile);
+        }
+        popFromPile(pile) {
             this.modified = true;
-            const id = this.drawPile.pop();
+            const id = pile.pop();
             if (id) {
                 this.adjustCount(id, 1);
             }
             return id;
+        }
+        popDiscard() {
+            return this.popFromPile(this.discardPile);
         }
         drawCount() {
             return this.drawPile.length;
@@ -22635,7 +22641,7 @@ define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src
             this.selectedPiece = p;
             this.modified = true;
         }
-        update(force = true) {
+        update(force = false) {
             if (!this.modified && !force) {
                 return;
             }
@@ -22767,6 +22773,7 @@ define("app/src/main", ["require", "exports", "app/src/common/util", "app/src/da
     const shadowButton = getElement('shadow-button');
     const shuffleButton = getElement('shuffle-button');
     const refreshButton = getElement('refresh-button');
+    const showDiscardButton = getElement('show-discard-button');
     const putTopButton = getElement('put-top-button');
     const putBottomButton = getElement('put-bottom-button');
     const deck = new deck_1.Deck();
@@ -22783,16 +22790,39 @@ define("app/src/main", ["require", "exports", "app/src/common/util", "app/src/da
     function getElement(id) {
         return (0, util_3.assertValid)(document.getElementById(id));
     }
+    function setupCollapsibles() {
+        for (const c of document.getElementsByClassName('collapsible')) {
+            c.addEventListener('click', () => {
+                c.classList.toggle('active');
+                const content = (0, util_3.assertValid)(c.nextElementSibling);
+                if (content.style.display === 'block') {
+                    content.style.display = 'none';
+                }
+                else {
+                    content.style.display = 'block';
+                }
+            });
+        }
+    }
     function buildScenarioPicker() {
-        const choices = [];
+        const parts = [];
         for (const campaign of database_2.CAMPAIGNS.values()) {
-            choices.push(`<h3>${campaign.name}</h3>`);
+            parts.push(`<div class="collapsible">${campaign.name}</div>`);
+            parts.push('<div class="content">');
             for (const id of campaign.scenarios) {
                 const scenario = (0, database_2.getScenario)(id);
-                choices.push(`<div><a href="#${scenario.id}">${scenario.name}</a></div>`);
+                parts.push(`<div class="scenario" data-sid="${scenario.id}">${scenario.name}</div>`);
             }
+            parts.push('</div>');
         }
-        getElement('scenario-list').innerHTML = choices.join('\n');
+        getElement('scenario-list').innerHTML = parts.join('\n');
+        setupCollapsibles();
+        for (const s of document.getElementsByClassName('scenario')) {
+            const el = s;
+            el.addEventListener('click', () => {
+                window.location.href = '#' + (0, util_3.assertValid)(el.dataset['sid']);
+            });
+        }
     }
     function update() {
         updateDeck();
@@ -22802,6 +22832,7 @@ define("app/src/main", ["require", "exports", "app/src/common/util", "app/src/da
         refreshButton.disabled = deck.drawCount() === 0 && deck.discardCount() === 0;
         putTopButton.disabled = !playmat.isEncounterSelected();
         putBottomButton.disabled = !playmat.isEncounterSelected();
+        showDiscardButton.disabled = deck.discardCount() === 0;
         playmat.update();
     }
     image_cache_2.imageCache.setLoadDoneCallback(() => {
@@ -22835,6 +22866,16 @@ define("app/src/main", ["require", "exports", "app/src/common/util", "app/src/da
     });
     putBottomButton.addEventListener('click', () => {
         playmat.returnToDeck(deck, deck_1.DeckPosition.BOTTOM);
+        update();
+    });
+    showDiscardButton.addEventListener('click', () => {
+        while (true) {
+            const id = deck.popDiscard();
+            if (!id) {
+                break;
+            }
+            playmat.play(id, false);
+        }
         update();
     });
     getElement('help-button').addEventListener('click', () => {
@@ -22936,7 +22977,7 @@ define("app/src/main", ["require", "exports", "app/src/common/util", "app/src/da
         if (hash) {
             getElement('scenario-tab').classList.add('hide');
             getElement('game-tab').classList.remove('hide');
-            startScenario(hash.slice(1));
+            startScenario(decodeURIComponent(hash.slice(1)));
         }
         else {
             getElement('scenario-tab').classList.remove('hide');
