@@ -1,0 +1,174 @@
+html {
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  margin: 0px;
+}
+
+#start-tab {
+  height: 100vh;
+  overflow: clip;
+}
+
+#start-col {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#scenario-list {
+  overflow-y: scroll;
+  overflow-x: clip;
+  flex: 1;
+}
+
+/* Style the button that is used to open and close the collapsible content */
+.collapsible {
+  background-color: #eee;
+  color: #444;
+  cursor: pointer;
+  padding: 18px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 18px;
+}
+
+/* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
+.active,
+.collapsible:hover {
+  background-color: #ccc;
+}
+
+
+.selected {
+  border: 1px solid black;
+  background-color: #ccc;
+}
+
+/* Style the collapsible content. Note: hidden by default */
+.content {
+  padding: 0 40px;
+  display: none;
+  overflow: hidden;
+  background-color: #f1f1f1;
+}
+
+.scenario {
+  padding: 5px;
+}
+
+.scenario:hover {
+  background-color: #ccc;
+}
+
+.collapsible:after {
+  content: '\02795 ';
+  /* Unicode character for "plus" sign (+) */
+  font-size: 13px;
+  color: white;
+  float: left;
+  margin-right: 5px;
+}
+
+.active:after {
+  content: "\2796 ";
+  /* Unicode character for "minus" sign (-) */
+}
+
+#game-tab {
+  height: 100%;
+}
+
+#top {
+  height: 100%;
+}
+
+#left-bar {
+  width: 300px;
+  flex-shrink: 0;
+  font-family: "Arial";
+  font-size: 20;
+  margin: 8px;
+}
+
+.info {
+  margin: 4px 5px;
+}
+
+#button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  margin: 0px;
+}
+
+button {
+  font-family: "Arial";
+  margin: 5px;
+  height: 40px;
+}
+
+#gallery {
+  /* height: 300px; */
+  /* width: 300px; */
+  overflow-y: scroll;
+  border-color: lightgray;
+  border-width: 1px;
+  border-style: solid;
+  font-family: "Segoe UI", Verdana, Helvetica, Sans-Serif;
+  font-size: 16;
+  cursor: pointer;
+  margin: 10px 5px;
+}
+
+.disabled {
+  color: lightgray;
+}
+
+#gallery>div:not(.disabled):hover {
+  background-color: lightgray;
+}
+
+#mat {
+  border-width: 1px;
+  border-style: solid;
+  overflow: clip;
+  flex-grow: 1;
+  flex-shrink: 1;
+}
+
+.dot {
+  height: 25px;
+  width: 25px;
+  background-color: azure;
+  border-radius: 50%;
+  display: block;
+  position: fixed;
+  text-align: center;
+  padding: 6px 3px 0px 3px;
+  z-index: 1;
+}
+
+.row {
+  display: flex;
+}
+
+.hide {
+  display: none;
+}
+
+#help {
+  position: fixed;
+  background-color: rgba(220, 220, 220, 1.0);
+  border-width: 1px;
+  border-style: solid;
+  padding: 10px;
+  top: 50px;
+  left: 30px;
+  width: 500px;
+  height: 500px;
+  z-index: 2;
+}
