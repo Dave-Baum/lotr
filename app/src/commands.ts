@@ -14,6 +14,13 @@ export interface RemoveCardCommand {
   destination: Destination;
 }
 
+export interface MoveCardCommand {
+  kind: 'move';
+  uid: number;
+  x: number;
+  y: number;
+}
+
 export interface StateRequest {
   kind: 'state';
 }
@@ -33,27 +40,25 @@ export interface PieceState {
   counter: number;
 }
 
-export interface StateResponse {
-  kind: 'state';
+export interface StatePost {
+  kind: 'state_p';
+}
+
+export interface StateNotify {
+  kind: 'state_n';
   gallery: string[];
   deck: DeckState;
   playmat: PieceState[];
 }
 
-
 // TODO: add commands for
 //  * play card
-//  * move card
 //  * shuffle deck (maybe via state update)
-//  * getting initial state from a session
 
-export type Command = AdjustCardCommand|RemoveCardCommand;
+export type Command = AdjustCardCommand|RemoveCardCommand|MoveCardCommand;
 
-export interface PostMessage {
-  kind: 'state';
-}
-
-export type NotifyMessage = StateResponse;
+export type PostMessage = StatePost|Command;
+export type NotifyMessage = StateNotify|Command;
 
 export interface ServerToClientEvents {
   post: (msg: PostMessage) => void;

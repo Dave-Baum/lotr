@@ -52,7 +52,7 @@ function connectToServer(room: string, host: boolean) {
     mode = Mode.HOSTING;
   } else {
     mode = Mode.JOINING;
-    socket.emit('post', {kind: 'state'});
+    socket.emit('post', {kind: 'state_p'});
   }
 }
 
@@ -61,25 +61,40 @@ function handlePost(message: PostMessage): void {
   if (!socket || mode !== Mode.HOSTING) {
     return;
   }
-  if (message.kind === 'state') {
-    socket.emit('notify', {
-      kind: 'state',
-      gallery: gallery.getIds(),
-      deck: deck.getState(),
-      playmat: playmat.getState(),
-    });
+  switch (message.kind) {
+    case 'state_p':
+      socket.emit('notify', {
+        kind: 'state_n',
+        gallery: gallery.getIds(),
+        deck: deck.getState(),
+        playmat: playmat.getState(),
+      });
+      break;
+    case 'adjust':
+    case 'remove':
+    case 'move':
+      queueCommand(message);
+      break;
   }
 }
 
 function handleNotify(message: NotifyMessage): void {
   console.log('notify', message);
   if (mode === Mode.JOINING) {
-    if (message.kind === 'state') {
+    if (message.kind === 'state_n') {
       gallery.setIds(message.gallery);
       deck.setState(message.deck);
       playmat.setState(message.playmat);
       update();
       mode = Mode.JOINED;
+    }
+  } else if (mode === Mode.JOINED) {
+    switch (message.kind) {
+      case 'adjust':
+      case 'remove':
+      case 'move':
+        handleCommand(message);
+        break;
     }
   }
 }
@@ -90,7 +105,6 @@ function playCard(id: string): void {
   }
   update();
 }
-
 
 function update() {
   updateDeck();
@@ -200,14 +214,29 @@ function handleCommand(command: Command): void {
         deck.add(id, command.destination);
       }
       break;
+    case 'move':
+      playmat.moveCard(command.uid, command.x, command.y);
+      break;
     default:
       throw new Error(`invalid command: ${command}`);
   }
   update();
 }
 
-function queueCommand(command: Command): void {
-  handleCommand(command);
+export function queueCommand(command: Command): void {
+  switch (mode) {
+    case Mode.HOSTING:
+      handleCommand(command);
+      assertValid(socket).emit('notify', command);
+      break;
+    case Mode.JOINED:
+    case Mode.JOINING:
+      assertValid(socket).emit('post', command);
+      break;
+    default:
+      // Ignore the command
+      break;
+  }
 }
 
 function adjustCard(adjustment: Adjustment, amount: number): void {

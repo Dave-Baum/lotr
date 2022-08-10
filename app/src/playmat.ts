@@ -2,6 +2,7 @@ import {Adjustment, PieceState} from 'commands';
 import {assertValid} from './common/util';
 import {getCard} from './database';
 import {imageCache} from './image_cache';
+import {queueCommand} from './main';
 
 const CARD_WIDTH = 240;
 const CARD_HEIGHT = CARD_WIDTH * 7 / 5;
@@ -207,7 +208,8 @@ export class Playmat {
       this.update();
     });
     this.canvas.addEventListener('mouseup', event => {
-      this.dragging = false;
+      this.mouseUp(event.offsetX, event.offsetY);
+      this.update();
     });
     this.canvas.addEventListener('mouseleave', event => {
       this.dragging = false;
@@ -304,6 +306,16 @@ export class Playmat {
     }
     this.modified = true;
     return id;
+  }
+
+  moveCard(uid: number, x: number, y: number) {
+    const piece = this.lookup(uid);
+    if (!piece) {
+      return;
+    }
+    piece.x = x;
+    piece.y = y;
+    this.modified = true;
   }
 
   private lookup(uid: number): Piece|undefined {
@@ -406,6 +418,20 @@ export class Playmat {
     }
     this.foundPiece = this.findPiece(x, y);
     this.checkZoom();
+  }
+
+  private mouseUp(x: number, y: number): void {
+    if (!this.dragging || !this.selectedPiece) {
+      return;
+    }
+    // TODO: this seam is uneven with how changes are applied
+    queueCommand({
+      kind: 'move',
+      uid: this.selectedPiece.uid,
+      x: x - this.dragOffsetX,
+      y: y - this.dragOffsetY,
+    });
+    this.dragging = false;
   }
 
   setShiftKey(shiftKey: boolean): void {
