@@ -24,7 +24,7 @@ export interface DeckState {
 }
 
 export interface PieceState {
-  kind: 'quest'|'encounter';
+  kind: 'quest'|'encounter'|'shadow';
   uid: number;
   cards: string[];
   x: number;
@@ -48,3 +48,18 @@ export interface StateResponse {
 //  * getting initial state from a session
 
 export type Command = AdjustCardCommand|RemoveCardCommand;
+
+export interface PostMessage {
+  kind: 'state';
+}
+
+export type NotifyMessage = StateResponse;
+
+export interface ServerToClientEvents {
+  post: (msg: PostMessage) => void;
+  notify: (msg: NotifyMessage) => void;
+}
+
+export interface ClientToServerEvents extends ServerToClientEvents {
+  join: (msg: {room: string, host: number}) => void;
+}

@@ -38,7 +38,8 @@ abstract class Piece {
 
   abstract getState(): PieceState;
 
-  protected createState(kind: 'encounter'|'quest', cards: string[]): PieceState{
+  protected createState(kind: 'encounter'|'quest'|'shadow', cards: string[]):
+  PieceState{
     return {
       kind, cards, uid: this.uid, x: this.x, y: this.y, phase: this.phase,
           counter: this.counter,
@@ -135,9 +136,9 @@ abstract class Piece {
   }
 }
 
-function getEncounterImages(id: string, faceDown: boolean) {
+function getEncounterImages(id: string, shadow: boolean) {
   const images = [];
-  if (faceDown) {
+  if (shadow) {
     images.push(imageCache.get(ENCOUNTER_IMAGE));
   }
   images.push(imageCache.get(getCard(id).image));
@@ -146,9 +147,9 @@ function getEncounterImages(id: string, faceDown: boolean) {
 
 class EncounterPiece extends Piece {
   constructor(
-      uid: number, private readonly id: string, faceDown: boolean, x: number,
-      y: number) {
-    super(uid, getEncounterImages(id, faceDown), x, y, CARD_WIDTH, CARD_HEIGHT);
+      uid: number, private readonly id: string,
+      private readonly shadow: boolean, x: number, y: number) {
+    super(uid, getEncounterImages(id, shadow), x, y, CARD_WIDTH, CARD_HEIGHT);
   }
 
   discardId(): string|null {
@@ -156,7 +157,7 @@ class EncounterPiece extends Piece {
   }
 
   getState(): PieceState {
-    return this.createState('encounter', [this.id]);
+    return this.createState(this.shadow ? 'shadow' : 'encounter', [this.id]);
   }
 }
 
@@ -229,10 +230,11 @@ export class Playmat {
     this.clear();
     for (const s of state) {
       let p: Piece;
-      if (s.kind === 'encounter') {
-        p = new EncounterPiece(s.uid, s.cards[0], false, s.x, s.y);
-      } else {
+      if (s.kind === 'quest') {
         p = new QuestPiece(s.uid, s.cards, s.x, s.y);
+      } else {
+        p = new EncounterPiece(
+            s.uid, s.cards[0], s.kind === 'shadow', s.x, s.y);
       }
       p.adjustPhase(s.phase);
       p.adjustCounter(s.counter);

@@ -1,6 +1,6 @@
 import {io, Socket} from 'socket.io-client';
 
-import {Adjustment, Command, Destination} from './commands';
+import {Adjustment, ClientToServerEvents, Command, Destination, NotifyMessage, PostMessage, ServerToClientEvents} from './commands';
 import {assertValid} from './common/util';
 import {CAMPAIGNS, CARDS, getCard, getScenario} from './database';
 import {Deck} from './deck';
@@ -36,7 +36,7 @@ enum Mode {
 
 const localOnly = window.location.protocol === 'file:';
 let mode: Mode = Mode.IDLE;
-let socket: Socket|undefined;
+let socket: Socket<ServerToClientEvents, ClientToServerEvents>|undefined;
 
 function connectToServer(room: string, host: boolean) {
   if (localOnly) {
@@ -55,9 +55,8 @@ function connectToServer(room: string, host: boolean) {
   }
 }
 
-function handlePost(message: any): void {
-  // TODO: add type safety
-  console.log('post!!!', message);
+function handlePost(message: PostMessage): void {
+  console.log('post', message);
   if (!socket || mode !== Mode.HOSTING) {
     return;
   }
@@ -71,8 +70,7 @@ function handlePost(message: any): void {
   }
 }
 
-function handleNotify(message: any): void {
-  // TODO: add type safety
+function handleNotify(message: NotifyMessage): void {
   console.log('notify', message);
   if (mode === Mode.JOINING) {
     if (message.kind === 'state') {
