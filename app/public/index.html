@@ -9,6 +9,7 @@
   <script type="text/javascript" src="data.js" defer></script>
   <script type="module" src="./main.js" defer></script>
   -->
+  <!--<script src="/socket.io/socket.io.js"></script> -->
   <script src="require.js"></script>
   <script src="main.js"></script>
   <script>
@@ -20,6 +21,11 @@
 
 <body>
   <div id="scenario-tab">
+    <div class="row">
+      <button id="local-button">Local</button>
+      <button id="host-button">Host</button>
+      <button id="join-button">Join</button>
+    </div>
     <div id="scenario-list">
     </div>
   </div>

@@ -14,6 +14,22 @@ export interface RemoveCardCommand {
   destination: Destination;
 }
 
+export interface StateRequest {
+  kind: 'state';
+}
+
+export interface DeckState {
+  draw: string[];
+  discard: string[];
+}
+
+export interface StateResponse {
+  kind: 'state';
+  gallery: string[];
+  deck: DeckState;
+}
+
+
 // TODO: add commands for
 //  * play card
 //  * move card

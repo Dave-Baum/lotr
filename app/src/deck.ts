@@ -1,4 +1,4 @@
-import {Destination} from './commands';
+import {DeckState, Destination} from './commands';
 
 function randomInt(max: number): number {
   return Math.floor(Math.random() * max);
@@ -15,6 +15,20 @@ export class Deck {
     this.discardPile.splice(0, this.discardPile.length);
     this.counts.clear();
     this.modified = true;
+  }
+
+  getState(): DeckState {
+    return {draw: this.drawPile, discard: this.discardPile};
+  }
+
+  setState(state: DeckState): void {
+    this.clear();
+    for (const id of state.draw) {
+      this.add(id, 'top');
+    }
+    for (const id of state.discard) {
+      this.add(id, 'discard');
+    }
   }
 
   private adjustCount(id: string, amount: number): void {

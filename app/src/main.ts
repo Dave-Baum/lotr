@@ -1,12 +1,15 @@
-import {RenameLocation} from 'typescript';
+import {io, Socket} from 'socket.io-client';
+
 import {Adjustment, Command, Destination} from './commands';
 import {assertValid} from './common/util';
-import {CAMPAIGNS, CARDS, getScenario} from './database';
+import {CAMPAIGNS, CARDS, getCard, getScenario} from './database';
 import {Deck} from './deck';
+import {Gallery} from './gallery';
 import {imageCache} from './image_cache';
 import {Playmat} from './playmat';
 
-const gallery = getElement('gallery');
+console.log('Running main.ts');
+
 const help = getElement('help');
 const mat = getElement('mat') as HTMLCanvasElement;
 const supplyCount = getElement('supply-count');
@@ -22,25 +25,66 @@ const putBottomButton = getElement('put-bottom-button') as HTMLButtonElement;
 
 const deck = new Deck();
 const playmat = new Playmat(mat);
+const gallery = new Gallery(getElement('gallery'), playCard);
 
-console.log('Running main.ts');
-
-function adjustMatSize() {
-  const bounds = mat.getBoundingClientRect();
-  console.log('adjustMatSize', bounds);
-  mat.width = bounds.width;
-  mat.height = bounds.height;
-  playmat.update(true);
+enum Mode {
+  IDLE = 'idle',
+  HOSTING = 'hosting',
+  JOINING = 'joining',
+  JOINED = 'joined',
 }
 
-const resizeObserver = new ResizeObserver(entries => {
-  adjustMatSize();
-});
-resizeObserver.observe(mat);
+let mode: Mode = Mode.IDLE;
+let socket: Socket|undefined;
 
+try {
+  if (window.location.protocol !== 'file:') {
+    socket = io();
+    socket.on('post', handlePost);
+    socket.on('notify', handleNotify);
+    console.log('Socket.io initialized');
+  }
+} catch (e) {
+}
+if (!socket) {
+  console.log('No socket.io, running locally');
+}
+
+function handlePost(message: any): void {
+  console.log('post', message);
+  if (!socket || mode !== Mode.HOSTING) {
+    return;
+  }
+  if (message.kind === 'state') {
+    socket.emit('notify', {
+      kind: 'state',
+      gallery: gallery.getIds(),
+      deck: deck.getState(),
+    });
+  }
+}
+
+function handleNotify(message: any): void {
+  console.log('notify', message);
+  if (mode === Mode.JOINING) {
+    if (message.kind === 'state') {
+      gallery.setIds(message.gallery);
+      deck.setState(message.deck);
+      update();
+      mode = Mode.JOINED;
+    }
+  }
+}
 
 function getElement(id: string): Element {
   return assertValid(document.getElementById(id));
+}
+
+function playCard(id: string): void {
+  if (deck.pick(id)) {
+    playmat.play(id);
+  }
+  update();
 }
 
 function setupCollapsibles() {
@@ -150,25 +194,13 @@ help.addEventListener('click', () => {
   help.classList.add('hide');
 });
 
-function updateGallery(): void {
-  for (const child of gallery.childNodes) {
-    const el = child as HTMLElement;
-    const count = deck.getCount(assertValid(el.dataset['cardId']));
-    if (count) {
-      el.classList.remove('disabled');
-    } else {
-      el.classList.add('disabled');
-    }
-  }
-}
-
 function updateDeck(): void {
   if (!deck.checkModified()) {
     return;
   }
   supplyCount.innerHTML = `${deck.drawCount()}`;
   discardCount.innerHTML = `${deck.discardCount()}`;
-  updateGallery();
+  gallery.update(deck);
 }
 
 function provideCards(scenarioId: string): void {
@@ -180,23 +212,9 @@ function provideCards(scenarioId: string): void {
   }
   deck.shuffle();
 
-  gallery.innerHTML = '';
   sortedCards.sort((a, b) => a.name.localeCompare(b.name));
-  for (const card of sortedCards) {
-    // prefetch the card image
-    imageCache.get(card.image);
-
-    const div = document.createElement('div');
-    div.dataset['cardId'] = card.id;
-    div.appendChild(document.createTextNode(card.name));
-    gallery.appendChild(div);
-    div.addEventListener('click', () => {
-      if (deck.pick(card.id)) {
-        playmat.play(card.id);
-      }
-      update();
-    });
-  }
+  const sortedIds = sortedCards.map(c => c.id);
+  gallery.setIds(sortedIds);
 
   playmat.setQuest(scenario.quests);
 }
@@ -287,13 +305,27 @@ function startScenario(id: string): void {
 function routeToPage(): void {
   const params = new URLSearchParams(window.location.search);
   const scenario = decodeURIComponent(params.get('scenario') || '');
-  if (scenario) {
-    getElement('scenario-tab').classList.add('hide');
-    getElement('game-tab').classList.remove('hide');
-    startScenario(scenario);
-  } else {
+  const room = socket ? params.get('room' || '') : '';
+  if (!room && !scenario) {
+    // selection
     getElement('scenario-tab').classList.remove('hide');
     getElement('game-tab').classList.add('hide');
+    mode = Mode.IDLE;
+  } else {
+    getElement('scenario-tab').classList.add('hide');
+    getElement('game-tab').classList.remove('hide');
+    if (socket && room) {
+      socket.emit('join', {room, host: scenario ? 1 : 0});
+      if (scenario) {
+        mode = Mode.HOSTING;
+      } else {
+        mode = Mode.JOINING;
+        socket.emit('post', {kind: 'state'});
+      }
+    }
+    if (scenario) {
+      startScenario(scenario);
+    }
   }
 }
 

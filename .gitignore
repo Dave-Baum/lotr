@@ -2,6 +2,8 @@ node_modules
 tools/dist
 app/build
 cache
+debug
+dist
 .vscode
 .DS_Store
 _.code-workspace

@@ -191,6 +191,14 @@ export class Playmat {
     this.canvas.addEventListener('mouseleave', event => {
       this.dragging = false;
     });
+
+    const resizeObserver = new ResizeObserver(entries => {
+      const bounds = this.canvas.getBoundingClientRect();
+      this.canvas.width = bounds.width;
+      this.canvas.height = bounds.height;
+      this.update(true);
+    });
+    resizeObserver.observe(this.canvas);
   }
 
   clear(): void {
@@ -298,7 +306,6 @@ export class Playmat {
     if (!this.modified && !force) {
       return;
     }
-    console.log('updating');
     const ctx = assertValid(this.canvas.getContext('2d'));
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const onTop = [];
