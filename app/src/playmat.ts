@@ -1,4 +1,4 @@
-import {Adjustment} from 'commands';
+import {Adjustment, PieceState} from 'commands';
 import {assertValid} from './common/util';
 import {getCard} from './database';
 import {imageCache} from './image_cache';
@@ -35,6 +35,15 @@ abstract class Piece {
       readonly uid: number, private readonly images: HTMLImageElement[],
       public x: number, public y: number, private readonly width: number,
       private readonly height: number) {}
+
+  abstract getState(): PieceState;
+
+  protected createState(kind: 'encounter'|'quest', cards: string[]): PieceState{
+    return {
+      kind, cards, uid: this.uid, x: this.x, y: this.y, phase: this.phase,
+          counter: this.counter,
+    }
+  };
 
   abstract discardId(): string|null;
 
@@ -145,9 +154,15 @@ class EncounterPiece extends Piece {
   discardId(): string|null {
     return this.id;
   }
+
+  getState(): PieceState {
+    return this.createState('encounter', [this.id]);
+  }
 }
 
 class QuestPiece extends Piece {
+  private cardIds: string[];
+
   constructor(uid: number, cardIds: string[], x: number, y: number) {
     const images = [];
     for (const id of cardIds) {
@@ -156,6 +171,11 @@ class QuestPiece extends Piece {
       images.push(imageCache.get(assertValid(card.imageB)));
     }
     super(uid, images, x, y, CARD_HEIGHT, CARD_WIDTH);
+    this.cardIds = cardIds;
+  }
+
+  getState(): PieceState {
+    return this.createState('quest', this.cardIds);
   }
 
   discardId(): string|null {
@@ -199,6 +219,26 @@ export class Playmat {
       this.update(true);
     });
     resizeObserver.observe(this.canvas);
+  }
+
+  getState(): PieceState[] {
+    return this.pieces.map(p => p.getState());
+  }
+
+  setState(state: PieceState[]): void {
+    this.clear();
+    for (const s of state) {
+      let p: Piece;
+      if (s.kind === 'encounter') {
+        p = new EncounterPiece(s.uid, s.cards[0], false, s.x, s.y);
+      } else {
+        p = new QuestPiece(s.uid, s.cards, s.x, s.y);
+      }
+      p.adjustPhase(s.phase);
+      p.adjustCounter(s.counter);
+      this.pieces.push(p);
+    }
+    this.modified = true;
   }
 
   clear(): void {

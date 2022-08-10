@@ -23,10 +23,21 @@ export interface DeckState {
   discard: string[];
 }
 
+export interface PieceState {
+  kind: 'quest'|'encounter';
+  uid: number;
+  cards: string[];
+  x: number;
+  y: number;
+  phase: number;
+  counter: number;
+}
+
 export interface StateResponse {
   kind: 'state';
   gallery: string[];
   deck: DeckState;
+  playmat: PieceState[];
 }
 
 

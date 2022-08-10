@@ -34,24 +34,30 @@ enum Mode {
   JOINED = 'joined',
 }
 
+const localOnly = window.location.protocol === 'file:';
 let mode: Mode = Mode.IDLE;
 let socket: Socket|undefined;
 
-try {
-  if (window.location.protocol !== 'file:') {
-    socket = io();
-    socket.on('post', handlePost);
-    socket.on('notify', handleNotify);
-    console.log('Socket.io initialized');
+function connectToServer(room: string, host: boolean) {
+  if (localOnly) {
+    throw new Error('Sockets are not allowed when running from files');
   }
-} catch (e) {
-}
-if (!socket) {
-  console.log('No socket.io, running locally');
+  socket = io();
+  socket.on('post', handlePost);
+  socket.on('notify', handleNotify);
+  console.log('Socket.io initialized');
+  socket.emit('join', {room, host: host ? 1 : 0});
+  if (host) {
+    mode = Mode.HOSTING;
+  } else {
+    mode = Mode.JOINING;
+    socket.emit('post', {kind: 'state'});
+  }
 }
 
 function handlePost(message: any): void {
-  console.log('post', message);
+  // TODO: add type safety
+  console.log('post!!!', message);
   if (!socket || mode !== Mode.HOSTING) {
     return;
   }
@@ -60,16 +66,19 @@ function handlePost(message: any): void {
       kind: 'state',
       gallery: gallery.getIds(),
       deck: deck.getState(),
+      playmat: playmat.getState(),
     });
   }
 }
 
 function handleNotify(message: any): void {
+  // TODO: add type safety
   console.log('notify', message);
   if (mode === Mode.JOINING) {
     if (message.kind === 'state') {
       gallery.setIds(message.gallery);
       deck.setState(message.deck);
+      playmat.setState(message.playmat);
       update();
       mode = Mode.JOINED;
     }
@@ -305,7 +314,7 @@ function startScenario(id: string): void {
 function routeToPage(): void {
   const params = new URLSearchParams(window.location.search);
   const scenario = decodeURIComponent(params.get('scenario') || '');
-  const room = socket ? params.get('room' || '') : '';
+  const room = params.get('room' || '');
   if (!room && !scenario) {
     // selection
     getElement('scenario-tab').classList.remove('hide');
@@ -314,14 +323,8 @@ function routeToPage(): void {
   } else {
     getElement('scenario-tab').classList.add('hide');
     getElement('game-tab').classList.remove('hide');
-    if (socket && room) {
-      socket.emit('join', {room, host: scenario ? 1 : 0});
-      if (scenario) {
-        mode = Mode.HOSTING;
-      } else {
-        mode = Mode.JOINING;
-        socket.emit('post', {kind: 'state'});
-      }
+    if (room) {
+      connectToServer(room, !!scenario);
     }
     if (scenario) {
       startScenario(scenario);
