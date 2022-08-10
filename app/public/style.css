@@ -7,6 +7,23 @@ body {
   margin: 0px;
 }
 
+#start-tab {
+  height: 100vh;
+  overflow: clip;
+}
+
+#start-col {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#scenario-list {
+  overflow-y: scroll;
+  overflow-x: clip;
+  flex: 1;
+}
+
 /* Style the button that is used to open and close the collapsible content */
 .collapsible {
   background-color: #eee;
@@ -23,6 +40,12 @@ body {
 /* Add a background color to the button if it is clicked on (add the .active class with JS), and when you move the mouse over it (hover) */
 .active,
 .collapsible:hover {
+  background-color: #ccc;
+}
+
+
+.selected {
+  border: 1px solid black;
   background-color: #ccc;
 }
 

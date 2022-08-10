@@ -2,11 +2,13 @@ import {io, Socket} from 'socket.io-client';
 
 import {Adjustment, ClientToServerEvents, Command, Destination, NotifyMessage, PostMessage, ServerToClientEvents} from './commands';
 import {assertValid} from './common/util';
-import {CAMPAIGNS, CARDS, getCard, getScenario} from './database';
+import {CARDS, getScenario} from './database';
 import {Deck} from './deck';
 import {Gallery} from './gallery';
 import {imageCache} from './image_cache';
 import {Playmat} from './playmat';
+import {initStartScreen} from './start';
+import {getElement, online} from './util';
 
 console.log('Running main.ts');
 
@@ -34,12 +36,11 @@ enum Mode {
   JOINED = 'joined',
 }
 
-const localOnly = window.location.protocol === 'file:';
 let mode: Mode = Mode.IDLE;
 let socket: Socket<ServerToClientEvents, ClientToServerEvents>|undefined;
 
 function connectToServer(room: string, host: boolean) {
-  if (localOnly) {
+  if (!online) {
     throw new Error('Sockets are not allowed when running from files');
   }
   socket = io();
@@ -83,10 +84,6 @@ function handleNotify(message: NotifyMessage): void {
   }
 }
 
-function getElement(id: string): Element {
-  return assertValid(document.getElementById(id));
-}
-
 function playCard(id: string): void {
   if (deck.pick(id)) {
     playmat.play(id);
@@ -94,41 +91,6 @@ function playCard(id: string): void {
   update();
 }
 
-function setupCollapsibles() {
-  for (const c of document.getElementsByClassName('collapsible')) {
-    c.addEventListener('click', () => {
-      c.classList.toggle('active');
-      const content = assertValid(c.nextElementSibling) as HTMLElement;
-      if (content.style.display === 'block') {
-        content.style.display = 'none';
-      } else {
-        content.style.display = 'block';
-      }
-    });
-  }
-}
-
-function buildScenarioPicker(): void {
-  const parts = [];
-  for (const campaign of CAMPAIGNS.values()) {
-    parts.push(`<div class="collapsible">${campaign.name}</div>`);
-    parts.push('<div class="content">');
-    for (const id of campaign.scenarios) {
-      const scenario = getScenario(id);
-      parts.push(`<div class="scenario" data-sid="${scenario.id}">${
-          scenario.name}</div>`);
-    }
-    parts.push('</div>');
-  }
-  getElement('scenario-list').innerHTML = parts.join('\n');
-  setupCollapsibles();
-  for (const s of document.getElementsByClassName('scenario')) {
-    const el = s as HTMLElement;
-    el.addEventListener('click', () => {
-      switchToScenario(assertValid(el.dataset['sid']));
-    });
-  }
-}
 
 function update() {
   updateDeck();
@@ -315,11 +277,11 @@ function routeToPage(): void {
   const room = params.get('room' || '');
   if (!room && !scenario) {
     // selection
-    getElement('scenario-tab').classList.remove('hide');
+    getElement('start-tab').classList.remove('hide');
     getElement('game-tab').classList.add('hide');
     mode = Mode.IDLE;
   } else {
-    getElement('scenario-tab').classList.add('hide');
+    getElement('start-tab').classList.add('hide');
     getElement('game-tab').classList.remove('hide');
     if (room) {
       connectToServer(room, !!scenario);
@@ -330,11 +292,14 @@ function routeToPage(): void {
   }
 }
 
-function switchToScenario(scenario: string): void {
-  // TODO: why does this need a cast to any?
-  const url = new URL(window.location as any);
-  url.searchParams.set('scenario', scenario);
-  window.history.pushState({}, '', url.toString());
+export function navigateTo(params: {scenario?: string, room?: string}): void {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) {
+      query.set(key, value);
+    }
+  }
+  window.history.pushState({}, '', '?' + query.toString());
   routeToPage();
 }
 
@@ -342,6 +307,5 @@ addEventListener('popstate', e => {
   routeToPage();
 });
 
-buildScenarioPicker();
-
+initStartScreen();
 routeToPage();
