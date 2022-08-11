@@ -22,8 +22,6 @@ const ENCOUNTER_IMAGE = 'encounter.webp';
 const ZOOMED_RATE = 0.004;
 const ZOOMED_MAX_SCALE = 0.5;
 
-let nextUid = 1;
-
 abstract class Piece {
   private counter = 0;
   private phase = 0;
@@ -332,12 +330,12 @@ export class Playmat {
     return !!(this.selectedPiece && this.selectedPiece.discardId());
   }
 
-  setQuest(questIds: string[]): void {
-    this.pieces.push(new QuestPiece(nextUid++, questIds, QUEST_X, QUEST_Y));
+  setQuest(uid: number, questIds: string[]): void {
+    this.pieces.push(new QuestPiece(uid, questIds, QUEST_X, QUEST_Y));
     this.modified = true;
   }
 
-  play(id: string, faceDown = false): void {
+  play(uid: number, id: string, faceDown = false): void {
     if (this.findPiece(PLAY_FIRST_X, PLAY_FIRST_Y)) {
       this.playX += PLAY_DELTA_X;
       this.playY += PLAY_DELTA_Y;
@@ -345,8 +343,7 @@ export class Playmat {
       this.playX = PLAY_FIRST_X;
       this.playY = PLAY_FIRST_Y;
     }
-    const p =
-        new EncounterPiece(nextUid++, id, faceDown, this.playX, this.playY);
+    const p = new EncounterPiece(uid, id, faceDown, this.playX, this.playY);
     if (faceDown) {
       this.pieces.unshift(p);
     } else {

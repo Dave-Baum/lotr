@@ -27,7 +27,9 @@ const putBottomButton = getElement('put-bottom-button') as HTMLButtonElement;
 
 const deck = new Deck();
 const playmat = new Playmat(mat);
-const gallery = new Gallery(getElement('gallery'), playCard);
+const gallery = new Gallery(
+    getElement('gallery'),
+    id => queueCommand({kind: 'play', uid: generateUid(), id}));
 
 enum Mode {
   IDLE = 'idle',
@@ -38,6 +40,11 @@ enum Mode {
 
 let mode: Mode = Mode.IDLE;
 let socket: Socket<ServerToClientEvents, ClientToServerEvents>|undefined;
+let nextUid = 1;
+
+function generateUid(): number {
+  return mode === Mode.HOSTING ? nextUid++ : 0;
+}
 
 function connectToServer(room: string, host: boolean) {
   if (!online) {
@@ -75,6 +82,10 @@ function handlePost(message: PostMessage): void {
     case 'move':
       queueCommand(message);
       break;
+    case 'play':
+      message.uid = generateUid();
+      queueCommand(message);
+      break;
   }
 }
 
@@ -93,17 +104,11 @@ function handleNotify(message: NotifyMessage): void {
       case 'adjust':
       case 'remove':
       case 'move':
+      case 'play':
         handleCommand(message);
         break;
     }
   }
-}
-
-function playCard(id: string): void {
-  if (deck.pick(id)) {
-    playmat.play(id);
-  }
-  update();
 }
 
 function update() {
@@ -124,21 +129,13 @@ imageCache.setLoadDoneCallback(() => {
   playmat.update(true);
 });
 
-function revealCard(faceDown: boolean) {
-  const id = deck.reveal();
-  if (id) {
-    playmat.play(id, faceDown);
-  }
-}
 
 revealButton.addEventListener('click', () => {
-  revealCard(false);
-  update();
+  queueCommand({kind: 'play', uid: generateUid()});
 });
 
 shadowButton.addEventListener('click', () => {
-  revealCard(true);
-  update();
+  queueCommand({kind: 'play', uid: generateUid(), shadow: true});
 });
 
 shuffleButton.addEventListener('click', () => {
@@ -164,7 +161,7 @@ showDiscardButton.addEventListener('click', () => {
     if (!id) {
       break;
     }
-    playmat.play(id, false);
+    playmat.play(nextUid++, id, false);
   }
   update();
 });
@@ -199,7 +196,7 @@ function provideCards(scenarioId: string): void {
   const sortedIds = sortedCards.map(c => c.id);
   gallery.setIds(sortedIds);
 
-  playmat.setQuest(scenario.quests);
+  playmat.setQuest(nextUid++, scenario.quests);
 }
 
 function handleCommand(command: Command): void {
@@ -217,6 +214,20 @@ function handleCommand(command: Command): void {
     case 'move':
       playmat.moveCard(command.uid, command.x, command.y);
       break;
+    case 'play': {
+      let id;
+      if (command.id) {
+        if (deck.pick(command.id)) {
+          id = command.id;
+        }
+      } else {
+        id = deck.reveal();
+      }
+      if (id) {
+        playmat.play(command.uid, id, !!command.shadow);
+      }
+      break;
+    }
     default:
       throw new Error(`invalid command: ${command}`);
   }
@@ -294,6 +305,7 @@ document.addEventListener('keyup', event => {
 });
 
 function startScenario(id: string): void {
+  nextUid = 1;
   deck.clear();
   playmat.clear();
   provideCards(id);

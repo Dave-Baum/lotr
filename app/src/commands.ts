@@ -21,6 +21,13 @@ export interface MoveCardCommand {
   y: number;
 }
 
+export interface PlayCardCommand {
+  kind: 'play';
+  uid: number;
+  id?: string;
+  shadow?: boolean;
+}
+
 export interface StateRequest {
   kind: 'state';
 }
@@ -52,10 +59,11 @@ export interface StateNotify {
 }
 
 // TODO: add commands for
-//  * play card
 //  * shuffle deck (maybe via state update)
+//  * show discards
 
-export type Command = AdjustCardCommand|RemoveCardCommand|MoveCardCommand;
+export type Command =
+    AdjustCardCommand|RemoveCardCommand|MoveCardCommand|PlayCardCommand;
 
 export type PostMessage = StatePost|Command;
 export type NotifyMessage = StateNotify|Command;
