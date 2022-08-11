@@ -33,7 +33,7 @@ const gallery = new Gallery(
 
 enum Mode {
   IDLE = 'idle',
-  HOSTING = 'hosting',
+  HOSTING = 'hosting',  // Also includes local play
   JOINING = 'joining',
   JOINED = 'joined',
 }
@@ -41,6 +41,36 @@ enum Mode {
 let mode: Mode = Mode.IDLE;
 let socket: Socket<ServerToClientEvents, ClientToServerEvents>|undefined;
 let nextUid = 1;
+
+type MessageFor<M, K> = M&{kind: K};
+type PostKind = PostMessage['kind'];
+type NotifyKind = NotifyMessage['kind'];
+type Handler<M> = (m: M) => void;
+const postHandlers = new Map<PostKind, Handler<PostMessage>>();
+const notifyHandlers =
+    new Map<NotifyKind, {mode: Mode, handler: Handler<NotifyMessage>}>();
+
+function definePost<K extends PostKind>(
+    kind: K, handler: Handler<MessageFor<PostMessage, K>>) {
+  postHandlers.set(kind, handler as Handler<PostMessage>);
+}
+
+function defineNotify<K extends NotifyKind>(
+    kind: K, handler: Handler<MessageFor<NotifyMessage, K>>,
+    mode: Mode = Mode.JOINED) {
+  notifyHandlers.set(kind, {mode, handler: handler as Handler<NotifyMessage>});
+}
+
+function defineSimple<K extends NotifyKind&PostKind>(
+    kind: K, handler: Handler<MessageFor<PostMessage&NotifyMessage, K>>): void {
+  definePost(kind, m => {
+    handler(m as any);
+    if (socket) {
+      socket.emit('notify', m as any);
+    }
+  });
+  defineNotify(kind, handler as any);
+}
 
 function generateUid(): number {
   return mode === Mode.HOSTING ? nextUid++ : 0;
@@ -65,58 +95,93 @@ function connectToServer(room: string, host: boolean) {
 
 function handlePost(message: PostMessage): void {
   console.log('post', message);
-  if (!socket || mode !== Mode.HOSTING) {
+  if (mode !== Mode.HOSTING) {
     return;
   }
-  switch (message.kind) {
-    case 'state_p':
-      socket.emit('notify', {
-        kind: 'state_n',
-        gallery: gallery.getIds(),
-        deck: deck.getState(),
-        playmat: playmat.getState(),
-      });
-      break;
-    case 'adjust':
-    case 'remove':
-    case 'move':
-      queueCommand(message);
-      break;
-    case 'play':
-      message.uid = generateUid();
-      queueCommand(message);
-      break;
-    case 'shuffle_p':
-      queueShuffle(message.includeDiscard);
-      break;
+  const h = postHandlers.get(message.kind);
+  if (!h) {
+    throw new Error(`No handler for post ${message.kind}`);
   }
+  h(message);
 }
 
 function handleNotify(message: NotifyMessage): void {
   console.log('notify', message);
-  if (mode === Mode.JOINING) {
-    if (message.kind === 'state_n') {
-      gallery.setIds(message.gallery);
-      deck.setState(message.deck);
-      playmat.setState(message.playmat);
-      update();
-      mode = Mode.JOINED;
-    }
-  } else if (mode === Mode.JOINED) {
-    switch (message.kind) {
-      case 'adjust':
-      case 'remove':
-      case 'move':
-      case 'play':
-        handleCommand(message);
-        break;
-      case 'shuffle_n':
-        deck.setState(message.deck);
-        update();
-        break;
-    }
+  const entry = notifyHandlers.get(message.kind);
+  if (!entry) {
+    throw new Error(`No handler for notify ${message.kind}`);
   }
+  if (mode !== entry.mode) {
+    return;
+  }
+  entry.handler(message);
 }
+
+definePost('state_p', m => {
+  assertValid(socket).emit('notify', {
+    kind: 'state_n',
+    gallery: gallery.getIds(),
+    deck: deck.getState(),
+    playmat: playmat.getState(),
+  });
+});
+
+defineNotify('state_n', m => {
+  gallery.setIds(m.gallery);
+  deck.setState(m.deck);
+  playmat.setState(m.playmat);
+  update();
+  mode = Mode.JOINED;
+}, Mode.JOINING);
+
+defineSimple('adjust', m => {
+  playmat.adjustCard(m.uid, m.adjustment, m.amount);
+  update();
+});
+
+defineSimple('remove', m => {
+  const id = playmat.removeCard(m.uid);
+  if (id) {
+    deck.add(id, m.destination);
+    update();
+  }
+});
+
+defineSimple('move', m => {
+  playmat.moveCard(m.uid, m.x, m.y);
+  update();
+});
+
+defineSimple('play', m => {
+  if (!m.uid) {
+    m.uid = generateUid();
+  }
+  let id;
+  if (m.id) {
+    if (deck.pick(m.id)) {
+      id = m.id;
+    }
+  } else {
+    id = deck.reveal();
+  }
+  if (id) {
+    playmat.play(m.uid, id, !!m.shadow);
+  }
+  update();
+});
+
+definePost('shuffle_p', m => {
+  deck.shuffle(m.includeDiscard);
+  if (socket) {
+    socket.emit('notify', {kind: 'shuffle_n', deck: deck.getState()});
+  }
+  update();
+});
+
+defineNotify('shuffle_n', m => {
+  deck.setState(m.deck);
+  update();
+});
 
 function update() {
   updateDeck();
@@ -145,10 +210,11 @@ shadowButton.addEventListener('click', () => {
 });
 
 shuffleButton.addEventListener('click', () => {
-  queueShuffle(false);
+  queueCommand({kind: 'shuffle_p', includeDiscard: false});
 });
+
 refreshButton.addEventListener('click', () => {
-  queueShuffle(true);
+  queueCommand({kind: 'shuffle_p', includeDiscard: true});
 });
 
 putTopButton.addEventListener('click', () => {
@@ -203,73 +269,14 @@ function provideCards(scenarioId: string): void {
   playmat.setQuest(nextUid++, scenario.quests);
 }
 
-function handleCommand(command: Command): void {
-  console.log(command);
-  switch (command.kind) {
-    case 'adjust':
-      playmat.adjustCard(command.uid, command.adjustment, command.amount);
-      break;
-    case 'remove':
-      const id = playmat.removeCard(command.uid);
-      if (id) {
-        deck.add(id, command.destination);
-      }
-      break;
-    case 'move':
-      playmat.moveCard(command.uid, command.x, command.y);
-      break;
-    case 'play': {
-      let id;
-      if (command.id) {
-        if (deck.pick(command.id)) {
-          id = command.id;
-        }
-      } else {
-        id = deck.reveal();
-      }
-      if (id) {
-        playmat.play(command.uid, id, !!command.shadow);
-      }
-      break;
-    }
-    default:
-      throw new Error(`invalid command: ${command}`);
-  }
-  update();
-}
-
-export function queueCommand(command: Command): void {
+export function queueCommand(message: PostMessage): void {
   switch (mode) {
     case Mode.HOSTING:
-      handleCommand(command);
-      assertValid(socket).emit('notify', command);
+      handlePost(message);
       break;
     case Mode.JOINED:
     case Mode.JOINING:
-      assertValid(socket).emit('post', command);
-      break;
-    default:
-      // Ignore the command
-      break;
-  }
-}
-
-function handleShuffle(includeDiscard: boolean): void {
-  deck.shuffle(includeDiscard);
-  if (socket) {
-    socket.emit('notify', {kind: 'shuffle_n', deck: deck.getState()});
-  }
-  update();
-}
-
-function queueShuffle(includeDiscard: boolean): void {
-  switch (mode) {
-    case Mode.HOSTING:
-      handleShuffle(includeDiscard);
-      break;
-    case Mode.JOINED:
-    case Mode.JOINING:
-      assertValid(socket).emit('post', {kind: 'shuffle_p', includeDiscard});
+      assertValid(socket).emit('post', message);
       break;
     default:
       // Ignore the command
@@ -355,6 +362,7 @@ function routeToPage(): void {
       connectToServer(room, !!scenario);
     }
     if (scenario) {
+      mode = Mode.HOSTING;
       startScenario(scenario);
     }
   }

@@ -28,7 +28,6 @@ export interface PlayCardCommand {
   shadow?: boolean;
 }
 
-
 export interface DeckState {
   draw: string[];
   discard: string[];
