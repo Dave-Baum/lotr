@@ -28,9 +28,6 @@ export interface PlayCardCommand {
   shadow?: boolean;
 }
 
-export interface StateRequest {
-  kind: 'state';
-}
 
 export interface DeckState {
   draw: string[];
@@ -58,15 +55,24 @@ export interface StateNotify {
   playmat: PieceState[];
 }
 
+export interface ShufflePost {
+  kind: 'shuffle_p';
+  includeDiscard: boolean;
+}
+
+export interface ShuffleNotify {
+  kind: 'shuffle_n';
+  deck: DeckState;
+}
+
 // TODO: add commands for
-//  * shuffle deck (maybe via state update)
 //  * show discards
 
 export type Command =
     AdjustCardCommand|RemoveCardCommand|MoveCardCommand|PlayCardCommand;
 
-export type PostMessage = StatePost|Command;
-export type NotifyMessage = StateNotify|Command;
+export type PostMessage = StatePost|ShufflePost|Command;
+export type NotifyMessage = StateNotify|ShuffleNotify|Command;
 
 export interface ServerToClientEvents {
   post: (msg: PostMessage) => void;

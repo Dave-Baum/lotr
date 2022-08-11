@@ -86,6 +86,9 @@ function handlePost(message: PostMessage): void {
       message.uid = generateUid();
       queueCommand(message);
       break;
+    case 'shuffle_p':
+      queueShuffle(message.includeDiscard);
+      break;
   }
 }
 
@@ -106,6 +109,10 @@ function handleNotify(message: NotifyMessage): void {
       case 'move':
       case 'play':
         handleCommand(message);
+        break;
+      case 'shuffle_n':
+        deck.setState(message.deck);
+        update();
         break;
     }
   }
@@ -129,7 +136,6 @@ imageCache.setLoadDoneCallback(() => {
   playmat.update(true);
 });
 
-
 revealButton.addEventListener('click', () => {
   queueCommand({kind: 'play', uid: generateUid()});
 });
@@ -139,12 +145,10 @@ shadowButton.addEventListener('click', () => {
 });
 
 shuffleButton.addEventListener('click', () => {
-  deck.shuffle(false);
-  update();
+  queueShuffle(false);
 });
 refreshButton.addEventListener('click', () => {
-  deck.shuffle(true);
-  update();
+  queueShuffle(true);
 });
 
 putTopButton.addEventListener('click', () => {
@@ -243,6 +247,29 @@ export function queueCommand(command: Command): void {
     case Mode.JOINED:
     case Mode.JOINING:
       assertValid(socket).emit('post', command);
+      break;
+    default:
+      // Ignore the command
+      break;
+  }
+}
+
+function handleShuffle(includeDiscard: boolean): void {
+  deck.shuffle(includeDiscard);
+  if (socket) {
+    socket.emit('notify', {kind: 'shuffle_n', deck: deck.getState()});
+  }
+  update();
+}
+
+function queueShuffle(includeDiscard: boolean): void {
+  switch (mode) {
+    case Mode.HOSTING:
+      handleShuffle(includeDiscard);
+      break;
+    case Mode.JOINED:
+    case Mode.JOINING:
+      assertValid(socket).emit('post', {kind: 'shuffle_p', includeDiscard});
       break;
     default:
       // Ignore the command
