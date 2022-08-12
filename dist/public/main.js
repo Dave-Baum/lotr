@@ -22355,7 +22355,7 @@ define("app/src/deck", ["require", "exports"], function (require, exports) {
             this.modified = true;
             const id = pile.pop();
             if (id) {
-                this.adjustCount(id, 1);
+                this.adjustCount(id, -1);
             }
             return id;
         }
@@ -22484,7 +22484,7 @@ define("app/src/gallery", ["require", "exports", "app/src/common/util", "app/src
     }
     exports.Gallery = Gallery;
 });
-define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src/database", "app/src/image_cache"], function (require, exports, util_3, database_2, image_cache_2) {
+define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src/database", "app/src/image_cache", "app/src/main"], function (require, exports, util_3, database_2, image_cache_2, main_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Playmat = void 0;
@@ -22504,7 +22504,6 @@ define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src
     const ENCOUNTER_IMAGE = 'encounter.webp';
     const ZOOMED_RATE = 0.004;
     const ZOOMED_MAX_SCALE = 0.5;
-    let nextUid = 1;
     class Piece {
         constructor(uid, images, x, y, width, height) {
             this.uid = uid;
@@ -22663,7 +22662,8 @@ define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src
                 this.update();
             });
             this.canvas.addEventListener('mouseup', event => {
-                this.dragging = false;
+                this.mouseUp(event.offsetX, event.offsetY);
+                this.update();
             });
             this.canvas.addEventListener('mouseleave', event => {
                 this.dragging = false;
@@ -22755,6 +22755,15 @@ define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src
             this.modified = true;
             return id;
         }
+        moveCard(uid, point) {
+            const piece = this.lookup(uid);
+            if (!piece) {
+                return;
+            }
+            piece.x = point.x;
+            piece.y = point.y;
+            this.modified = true;
+        }
         lookup(uid) {
             // TODO: use a map for faster uid lookup
             for (const p of this.pieces) {
@@ -22767,20 +22776,27 @@ define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src
         isEncounterSelected() {
             return !!(this.selectedPiece && this.selectedPiece.discardId());
         }
-        setQuest(questIds) {
-            this.pieces.push(new QuestPiece(nextUid++, questIds, QUEST_X, QUEST_Y));
+        setQuest(uid, questIds) {
+            this.pieces.push(new QuestPiece(uid, questIds, QUEST_X, QUEST_Y));
             this.modified = true;
         }
-        play(id, faceDown = false) {
+        getPlayPoint() {
+            let x;
+            let y;
             if (this.findPiece(PLAY_FIRST_X, PLAY_FIRST_Y)) {
-                this.playX += PLAY_DELTA_X;
-                this.playY += PLAY_DELTA_Y;
+                x = this.playX + PLAY_DELTA_X;
+                y = this.playY + PLAY_DELTA_Y;
             }
             else {
-                this.playX = PLAY_FIRST_X;
-                this.playY = PLAY_FIRST_Y;
+                x = PLAY_FIRST_X;
+                y = PLAY_FIRST_Y;
             }
-            const p = new EncounterPiece(nextUid++, id, faceDown, this.playX, this.playY);
+            return { x, y };
+        }
+        play(uid, id, point, faceDown = false) {
+            this.playX = point.x;
+            this.playY = point.y;
+            const p = new EncounterPiece(uid, id, faceDown, point.x, point.y);
             if (faceDown) {
                 this.pieces.unshift(p);
             }
@@ -22850,6 +22866,21 @@ define("app/src/playmat", ["require", "exports", "app/src/common/util", "app/src
             this.foundPiece = this.findPiece(x, y);
             this.checkZoom();
         }
+        mouseUp(x, y) {
+            if (!this.dragging || !this.selectedPiece) {
+                return;
+            }
+            // TODO: this seam is uneven with how changes are applied
+            (0, main_1.submitMessage)({
+                kind: 'move',
+                uid: this.selectedPiece.uid,
+                point: {
+                    x: x - this.dragOffsetX,
+                    y: y - this.dragOffsetY,
+                },
+            });
+            this.dragging = false;
+        }
         setShiftKey(shiftKey) {
             this.shiftKey = shiftKey;
             this.checkZoom();
@@ -22877,7 +22908,7 @@ define("app/src/util", ["require", "exports", "app/src/common/util"], function (
     exports.getElement = getElement;
     exports.online = window.location.protocol !== 'file:';
 });
-define("app/src/start", ["require", "exports", "app/src/common/util", "app/src/database", "app/src/main", "app/src/util"], function (require, exports, util_5, database_3, main_1, util_6) {
+define("app/src/start", ["require", "exports", "app/src/common/util", "app/src/database", "app/src/main", "app/src/util"], function (require, exports, util_5, database_3, main_2, util_6) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.initStartScreen = void 0;
@@ -22890,18 +22921,18 @@ define("app/src/start", ["require", "exports", "app/src/common/util", "app/src/d
         return (0, util_5.assertValid)((0, util_5.assertValid)(selectedScenario).dataset['sid']);
     }
     playButton.addEventListener('click', () => {
-        (0, main_1.navigateTo)({
+        (0, main_2.navigateTo)({
             scenario: selectedId(),
         });
     });
     hostButton.addEventListener('click', () => {
-        (0, main_1.navigateTo)({
+        (0, main_2.navigateTo)({
             scenario: selectedId(),
             room: DEFAULT_ROOM,
         });
     });
     joinButton.addEventListener('click', () => {
-        (0, main_1.navigateTo)({
+        (0, main_2.navigateTo)({
             room: DEFAULT_ROOM,
         });
     });
@@ -22960,7 +22991,7 @@ define("app/src/start", ["require", "exports", "app/src/common/util", "app/src/d
 define("app/src/main", ["require", "exports", "socket.io-client", "app/src/common/util", "app/src/database", "app/src/deck", "app/src/gallery", "app/src/image_cache", "app/src/playmat", "app/src/start", "app/src/util"], function (require, exports, socket_io_client_1, util_7, database_4, deck_1, gallery_1, image_cache_3, playmat_1, start_1, util_8) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.navigateTo = void 0;
+    exports.navigateTo = exports.submitMessage = void 0;
     console.log('Running main.ts');
     const help = (0, util_8.getElement)('help');
     const mat = (0, util_8.getElement)('mat');
@@ -22975,7 +23006,7 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
     const putBottomButton = (0, util_8.getElement)('put-bottom-button');
     const deck = new deck_1.Deck();
     const playmat = new playmat_1.Playmat(mat);
-    const gallery = new gallery_1.Gallery((0, util_8.getElement)('gallery'), playCard);
+    const gallery = new gallery_1.Gallery((0, util_8.getElement)('gallery'), id => submitMessage({ kind: 'play', uid: generateUid(), id }));
     var Mode;
     (function (Mode) {
         Mode["IDLE"] = "idle";
@@ -22985,6 +23016,28 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
     })(Mode || (Mode = {}));
     let mode = Mode.IDLE;
     let socket;
+    let nextUid = 1;
+    const postDispatch = {};
+    const notifyDispatch = {};
+    const joiningMessages = new Set();
+    function definePost(kind, handler) {
+        postDispatch[kind] = handler;
+    }
+    function defineNotify(kind, handler) {
+        notifyDispatch[kind] = handler;
+    }
+    function defineSymmetric(kind, handler) {
+        definePost(kind, (m) => {
+            handler(m);
+            if (socket) {
+                socket.emit('notify', m);
+            }
+        });
+        defineNotify(kind, handler);
+    }
+    function generateUid() {
+        return mode === Mode.HOSTING ? nextUid++ : 0;
+    }
     function connectToServer(room, host) {
         if (!util_8.online) {
             throw new Error('Sockets are not allowed when running from files');
@@ -22999,41 +23052,97 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
         }
         else {
             mode = Mode.JOINING;
-            socket.emit('post', { kind: 'state' });
+            socket.emit('post', { kind: 'state_p' });
         }
     }
     function handlePost(message) {
         console.log('post', message);
-        if (!socket || mode !== Mode.HOSTING) {
+        if (mode !== Mode.HOSTING) {
             return;
         }
-        if (message.kind === 'state') {
-            socket.emit('notify', {
-                kind: 'state',
-                gallery: gallery.getIds(),
-                deck: deck.getState(),
-                playmat: playmat.getState(),
-            });
+        const h = postDispatch[message.kind];
+        if (!h) {
+            throw new Error(`No handler for post ${message.kind}`);
         }
+        h(message);
     }
     function handleNotify(message) {
         console.log('notify', message);
-        if (mode === Mode.JOINING) {
-            if (message.kind === 'state') {
-                gallery.setIds(message.gallery);
-                deck.setState(message.deck);
-                playmat.setState(message.playmat);
-                update();
-                mode = Mode.JOINED;
+        const h = notifyDispatch[message.kind];
+        if (!h) {
+            throw new Error(`No handler for notify ${message.kind}`);
+        }
+        if (mode === Mode.JOINED ||
+            (mode === Mode.JOINING && joiningMessages.has(message.kind))) {
+            h(message);
+        }
+    }
+    definePost('state_p', m => {
+        (0, util_7.assertValid)(socket).emit('notify', {
+            kind: 'state_n',
+            gallery: gallery.getIds(),
+            deck: deck.getState(),
+            playmat: playmat.getState(),
+        });
+    });
+    defineNotify('state_n', m => {
+        if (mode !== Mode.JOINING) {
+            return;
+        }
+        gallery.setIds(m.gallery);
+        deck.setState(m.deck);
+        playmat.setState(m.playmat);
+        update();
+        mode = Mode.JOINED;
+    });
+    joiningMessages.add('state_n');
+    defineSymmetric('adjust', m => {
+        playmat.adjustCard(m.uid, m.adjustment, m.amount);
+        update();
+    });
+    defineSymmetric('remove', m => {
+        const id = playmat.removeCard(m.uid);
+        if (id) {
+            deck.add(id, m.destination);
+            update();
+        }
+    });
+    defineSymmetric('move', m => {
+        playmat.moveCard(m.uid, m.point);
+        update();
+    });
+    defineSymmetric('play', m => {
+        if (!m.uid) {
+            m.uid = generateUid();
+        }
+        if (!m.point) {
+            m.point = playmat.getPlayPoint();
+        }
+        let id;
+        if (m.id) {
+            if (deck.pick(m.id)) {
+                id = m.id;
             }
         }
-    }
-    function playCard(id) {
-        if (deck.pick(id)) {
-            playmat.play(id);
+        else {
+            id = deck.reveal();
+        }
+        if (id) {
+            playmat.play(m.uid, id, m.point, !!m.shadow);
         }
         update();
-    }
+    });
+    definePost('shuffle_p', m => {
+        deck.shuffle(m.includeDiscard);
+        if (socket) {
+            socket.emit('notify', { kind: 'shuffle_n', deck: deck.getState() });
+        }
+        update();
+    });
+    defineNotify('shuffle_n', m => {
+        deck.setState(m.deck);
+        update();
+    });
     function update() {
         updateDeck();
         revealButton.disabled = deck.drawCount() === 0;
@@ -23049,27 +23158,17 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
         console.log('image loading complete');
         playmat.update(true);
     });
-    function revealCard(faceDown) {
-        const id = deck.reveal();
-        if (id) {
-            playmat.play(id, faceDown);
-        }
-    }
     revealButton.addEventListener('click', () => {
-        revealCard(false);
-        update();
+        submitMessage({ kind: 'play', uid: generateUid() });
     });
     shadowButton.addEventListener('click', () => {
-        revealCard(true);
-        update();
+        submitMessage({ kind: 'play', uid: generateUid(), shadow: true });
     });
     shuffleButton.addEventListener('click', () => {
-        deck.shuffle(false);
-        update();
+        submitMessage({ kind: 'shuffle_p', includeDiscard: false });
     });
     refreshButton.addEventListener('click', () => {
-        deck.shuffle(true);
-        update();
+        submitMessage({ kind: 'shuffle_p', includeDiscard: true });
     });
     putTopButton.addEventListener('click', () => {
         removeCard('top');
@@ -23083,7 +23182,7 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
             if (!id) {
                 break;
             }
-            playmat.play(id, false);
+            playmat.play(nextUid++, id, playmat.getPlayPoint(), false);
         }
         update();
     });
@@ -23112,38 +23211,33 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
         sortedCards.sort((a, b) => a.name.localeCompare(b.name));
         const sortedIds = sortedCards.map(c => c.id);
         gallery.setIds(sortedIds);
-        playmat.setQuest(scenario.quests);
+        playmat.setQuest(nextUid++, scenario.quests);
     }
-    function handleCommand(command) {
-        console.log(command);
-        switch (command.kind) {
-            case 'adjust':
-                playmat.adjustCard(command.uid, command.adjustment, command.amount);
+    function submitMessage(message) {
+        switch (mode) {
+            case Mode.HOSTING:
+                handlePost(message);
                 break;
-            case 'remove':
-                const id = playmat.removeCard(command.uid);
-                if (id) {
-                    deck.add(id, command.destination);
-                }
+            case Mode.JOINED:
+            case Mode.JOINING:
+                (0, util_7.assertValid)(socket).emit('post', message);
                 break;
             default:
-                throw new Error(`invalid command: ${command}`);
+                // Ignore the command
+                break;
         }
-        update();
     }
-    function queueCommand(command) {
-        handleCommand(command);
-    }
+    exports.submitMessage = submitMessage;
     function adjustCard(adjustment, amount) {
         const uid = playmat.selectedUid();
         if (uid) {
-            queueCommand({ kind: 'adjust', uid, adjustment, amount });
+            submitMessage({ kind: 'adjust', uid, adjustment, amount });
         }
     }
     function removeCard(destination) {
         const uid = playmat.selectedUid();
         if (uid) {
-            queueCommand({ kind: 'remove', uid, destination });
+            submitMessage({ kind: 'remove', uid, destination });
         }
     }
     document.addEventListener('keydown', event => {
@@ -23185,6 +23279,7 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
         update();
     });
     function startScenario(id) {
+        nextUid = 1;
         deck.clear();
         playmat.clear();
         provideCards(id);
@@ -23207,6 +23302,7 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
                 connectToServer(room, !!scenario);
             }
             if (scenario) {
+                mode = Mode.HOSTING;
                 startScenario(scenario);
             }
         }
