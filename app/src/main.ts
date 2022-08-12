@@ -1,6 +1,6 @@
 import {io, Socket} from 'socket.io-client';
 
-import {Adjustment, ClientToServerEvents, Command, Destination, NotifyMessage, PostMessage, ServerToClientEvents} from './commands';
+import {Adjustment, ClientToServerEvents, Destination, NotifyMessage, PostMessage, ServerToClientEvents, SymmetricMessage} from './commands';
 import {assertValid} from './common/util';
 import {CARDS, getScenario} from './database';
 import {Deck} from './deck';
@@ -29,7 +29,7 @@ const deck = new Deck();
 const playmat = new Playmat(mat);
 const gallery = new Gallery(
     getElement('gallery'),
-    id => queueCommand({kind: 'play', uid: generateUid(), id}));
+    id => submitMessage({kind: 'play', uid: generateUid(), id}));
 
 enum Mode {
   IDLE = 'idle',
@@ -42,31 +42,40 @@ let mode: Mode = Mode.IDLE;
 let socket: Socket<ServerToClientEvents, ClientToServerEvents>|undefined;
 let nextUid = 1;
 
-type MessageFor<M, K> = M&{kind: K};
 type PostKind = PostMessage['kind'];
 type NotifyKind = NotifyMessage['kind'];
 type Handler<M> = (m: M) => void;
-const postHandlers = new Map<PostKind, Handler<PostMessage>>();
-const notifyHandlers =
-    new Map<NotifyKind, {mode: Mode, handler: Handler<NotifyMessage>}>();
 
-function definePost<K extends PostKind>(
-    kind: K, handler: Handler<MessageFor<PostMessage, K>>) {
-  postHandlers.set(kind, handler as Handler<PostMessage>);
+type MessageTypes = {
+  [M in PostMessage | NotifyMessage as M['kind']]: M;
+};
+type PostDispatch = {
+  [M in PostMessage as M['kind']]: Handler<M>;
+};
+type NotifyDispatch = {
+  [M in NotifyMessage as M['kind']]: Handler<M>;
+};
+
+const postDispatch: Partial<PostDispatch> = {};
+const notifyDispatch: Partial<NotifyDispatch> = {};
+const joiningMessages = new Set<NotifyKind>();
+
+function definePost<K extends keyof PostDispatch>(
+    kind: K, handler: PostDispatch[K]): void {
+  postDispatch[kind] = handler;
 }
 
 function defineNotify<K extends NotifyKind>(
-    kind: K, handler: Handler<MessageFor<NotifyMessage, K>>,
-    mode: Mode = Mode.JOINED) {
-  notifyHandlers.set(kind, {mode, handler: handler as Handler<NotifyMessage>});
+    kind: K, handler: NotifyDispatch[K]): void {
+  notifyDispatch[kind] = handler;
 }
 
-function defineSimple<K extends NotifyKind&PostKind>(
-    kind: K, handler: Handler<MessageFor<PostMessage&NotifyMessage, K>>): void {
-  definePost(kind, m => {
+function defineSymmetric<K extends SymmetricMessage['kind']>(
+    kind: K, handler: Handler<MessageTypes[K]>): void {
+  definePost<K>(kind, (m: SymmetricMessage) => {
     handler(m as any);
     if (socket) {
-      socket.emit('notify', m as any);
+      socket.emit('notify', m);
     }
   });
   defineNotify(kind, handler as any);
@@ -98,7 +107,7 @@ function handlePost(message: PostMessage): void {
   if (mode !== Mode.HOSTING) {
     return;
   }
-  const h = postHandlers.get(message.kind);
+  const h = postDispatch[message.kind] as Handler<PostMessage>;
   if (!h) {
     throw new Error(`No handler for post ${message.kind}`);
   }
@@ -107,14 +116,14 @@ function handlePost(message: PostMessage): void {
 
 function handleNotify(message: NotifyMessage): void {
   console.log('notify', message);
-  const entry = notifyHandlers.get(message.kind);
-  if (!entry) {
+  const h = notifyDispatch[message.kind] as Handler<NotifyMessage>;
+  if (!h) {
     throw new Error(`No handler for notify ${message.kind}`);
   }
-  if (mode !== entry.mode) {
-    return;
+  if (mode === Mode.JOINED ||
+      (mode === Mode.JOINING && joiningMessages.has(message.kind))) {
+    h(message);
   }
-  entry.handler(message);
 }
 
 definePost('state_p', m => {
@@ -127,19 +136,23 @@ definePost('state_p', m => {
 });
 
 defineNotify('state_n', m => {
+  if (mode !== Mode.JOINING) {
+    return;
+  }
   gallery.setIds(m.gallery);
   deck.setState(m.deck);
   playmat.setState(m.playmat);
   update();
   mode = Mode.JOINED;
-}, Mode.JOINING);
+});
+joiningMessages.add('state_n');
 
-defineSimple('adjust', m => {
+defineSymmetric('adjust', m => {
   playmat.adjustCard(m.uid, m.adjustment, m.amount);
   update();
 });
 
-defineSimple('remove', m => {
+defineSymmetric('remove', m => {
   const id = playmat.removeCard(m.uid);
   if (id) {
     deck.add(id, m.destination);
@@ -147,14 +160,17 @@ defineSimple('remove', m => {
   }
 });
 
-defineSimple('move', m => {
-  playmat.moveCard(m.uid, m.x, m.y);
+defineSymmetric('move', m => {
+  playmat.moveCard(m.uid, m.point);
   update();
 });
 
-defineSimple('play', m => {
+defineSymmetric('play', m => {
   if (!m.uid) {
     m.uid = generateUid();
+  }
+  if (!m.point) {
+    m.point = playmat.getPlayPoint();
   }
   let id;
   if (m.id) {
@@ -165,7 +181,7 @@ defineSimple('play', m => {
     id = deck.reveal();
   }
   if (id) {
-    playmat.play(m.uid, id, !!m.shadow);
+    playmat.play(m.uid, id, m.point, !!m.shadow);
   }
   update();
 });
@@ -202,19 +218,19 @@ imageCache.setLoadDoneCallback(() => {
 });
 
 revealButton.addEventListener('click', () => {
-  queueCommand({kind: 'play', uid: generateUid()});
+  submitMessage({kind: 'play', uid: generateUid()});
 });
 
 shadowButton.addEventListener('click', () => {
-  queueCommand({kind: 'play', uid: generateUid(), shadow: true});
+  submitMessage({kind: 'play', uid: generateUid(), shadow: true});
 });
 
 shuffleButton.addEventListener('click', () => {
-  queueCommand({kind: 'shuffle_p', includeDiscard: false});
+  submitMessage({kind: 'shuffle_p', includeDiscard: false});
 });
 
 refreshButton.addEventListener('click', () => {
-  queueCommand({kind: 'shuffle_p', includeDiscard: true});
+  submitMessage({kind: 'shuffle_p', includeDiscard: true});
 });
 
 putTopButton.addEventListener('click', () => {
@@ -231,7 +247,7 @@ showDiscardButton.addEventListener('click', () => {
     if (!id) {
       break;
     }
-    playmat.play(nextUid++, id, false);
+    playmat.play(nextUid++, id, playmat.getPlayPoint(), false);
   }
   update();
 });
@@ -269,7 +285,7 @@ function provideCards(scenarioId: string): void {
   playmat.setQuest(nextUid++, scenario.quests);
 }
 
-export function queueCommand(message: PostMessage): void {
+export function submitMessage(message: PostMessage): void {
   switch (mode) {
     case Mode.HOSTING:
       handlePost(message);
@@ -287,14 +303,14 @@ export function queueCommand(message: PostMessage): void {
 function adjustCard(adjustment: Adjustment, amount: number): void {
   const uid = playmat.selectedUid();
   if (uid) {
-    queueCommand({kind: 'adjust', uid, adjustment, amount});
+    submitMessage({kind: 'adjust', uid, adjustment, amount});
   }
 }
 
 function removeCard(destination: Destination): void {
   const uid = playmat.selectedUid();
   if (uid) {
-    queueCommand({kind: 'remove', uid, destination});
+    submitMessage({kind: 'remove', uid, destination});
   }
 }
 

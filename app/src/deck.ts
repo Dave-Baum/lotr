@@ -65,7 +65,7 @@ export class Deck {
     this.modified = true;
     const id = pile.pop();
     if (id) {
-      this.adjustCount(id, 1);
+      this.adjustCount(id, -1);
     }
     return id;
   }

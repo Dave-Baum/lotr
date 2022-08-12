@@ -1,8 +1,9 @@
-import {Adjustment, PieceState} from 'commands';
+import {Adjustment, PieceState, Point} from 'commands';
+
 import {assertValid} from './common/util';
 import {getCard} from './database';
 import {imageCache} from './image_cache';
-import {queueCommand} from './main';
+import {submitMessage} from './main';
 
 const CARD_WIDTH = 240;
 const CARD_HEIGHT = CARD_WIDTH * 7 / 5;
@@ -306,13 +307,13 @@ export class Playmat {
     return id;
   }
 
-  moveCard(uid: number, x: number, y: number) {
+  moveCard(uid: number, point: Point) {
     const piece = this.lookup(uid);
     if (!piece) {
       return;
     }
-    piece.x = x;
-    piece.y = y;
+    piece.x = point.x;
+    piece.y = point.y;
     this.modified = true;
   }
 
@@ -335,15 +336,23 @@ export class Playmat {
     this.modified = true;
   }
 
-  play(uid: number, id: string, faceDown = false): void {
+  getPlayPoint(): Point {
+    let x;
+    let y;
     if (this.findPiece(PLAY_FIRST_X, PLAY_FIRST_Y)) {
-      this.playX += PLAY_DELTA_X;
-      this.playY += PLAY_DELTA_Y;
+      x = this.playX + PLAY_DELTA_X;
+      y = this.playY + PLAY_DELTA_Y;
     } else {
-      this.playX = PLAY_FIRST_X;
-      this.playY = PLAY_FIRST_Y;
+      x = PLAY_FIRST_X;
+      y = PLAY_FIRST_Y;
     }
-    const p = new EncounterPiece(uid, id, faceDown, this.playX, this.playY);
+    return {x, y};
+  }
+
+  play(uid: number, id: string, point: Point, faceDown = false): void {
+    this.playX = point.x;
+    this.playY = point.y;
+    const p = new EncounterPiece(uid, id, faceDown, point.x, point.y);
     if (faceDown) {
       this.pieces.unshift(p);
     } else {
@@ -422,11 +431,13 @@ export class Playmat {
       return;
     }
     // TODO: this seam is uneven with how changes are applied
-    queueCommand({
+    submitMessage({
       kind: 'move',
       uid: this.selectedPiece.uid,
-      x: x - this.dragOffsetX,
-      y: y - this.dragOffsetY,
+      point: {
+        x: x - this.dragOffsetX,
+        y: y - this.dragOffsetY,
+      },
     });
     this.dragging = false;
   }

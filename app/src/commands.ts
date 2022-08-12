@@ -1,29 +1,34 @@
 export type Adjustment = 'phase'|'counter'|'order';
 export type Destination = 'discard'|'top'|'bottom';
 
-export interface AdjustCardCommand {
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface AdjustCardMessage {
   kind: 'adjust';
   uid: number;
   adjustment: Adjustment;
   amount: number;
 }
 
-export interface RemoveCardCommand {
+export interface RemoveCardMessage {
   kind: 'remove';
   uid: number;
   destination: Destination;
 }
 
-export interface MoveCardCommand {
+export interface MoveCardMessage {
   kind: 'move';
   uid: number;
-  x: number;
-  y: number;
+  point: Point;
 }
 
-export interface PlayCardCommand {
+export interface PlayCardMessage {
   kind: 'play';
   uid: number;
+  point?: Point;
   id?: string;
   shadow?: boolean;
 }
@@ -67,11 +72,11 @@ export interface ShuffleNotify {
 // TODO: add commands for
 //  * show discards
 
-export type Command =
-    AdjustCardCommand|RemoveCardCommand|MoveCardCommand|PlayCardCommand;
+export type SymmetricMessage =
+    AdjustCardMessage|RemoveCardMessage|MoveCardMessage|PlayCardMessage;
 
-export type PostMessage = StatePost|ShufflePost|Command;
-export type NotifyMessage = StateNotify|ShuffleNotify|Command;
+export type PostMessage = StatePost|ShufflePost|SymmetricMessage;
+export type NotifyMessage = StateNotify|ShuffleNotify|SymmetricMessage;
 
 export interface ServerToClientEvents {
   post: (msg: PostMessage) => void;
