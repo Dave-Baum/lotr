@@ -69,13 +69,15 @@ export interface ShuffleNotify {
   deck: DeckState;
 }
 
-// TODO: add commands for
-//  * show discards
+export interface PlayDiscardsPost {
+  kind: 'play_discards_p';
+}
 
 export type SymmetricMessage =
     AdjustCardMessage|RemoveCardMessage|MoveCardMessage|PlayCardMessage;
 
-export type PostMessage = StatePost|ShufflePost|SymmetricMessage;
+export type PostMessage =
+    StatePost|ShufflePost|PlayDiscardsPost|SymmetricMessage;
 export type NotifyMessage = StateNotify|ShuffleNotify|SymmetricMessage;
 
 export interface ServerToClientEvents {

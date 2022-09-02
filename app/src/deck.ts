@@ -104,6 +104,11 @@ export class Deck {
     }
   }
 
+  peekDiscard(): string|undefined {
+    const n = this.discardPile.length;
+    return n ? this.discardPile[n - 1] : undefined;
+  }
+
   pick(id: string): boolean {
     const pickFrom = (pile: string[]) => {
       const i = pile.indexOf(id);
@@ -116,7 +121,7 @@ export class Deck {
     };
 
     this.modified = true;
-    return pickFrom(this.drawPile) || pickFrom(this.discardPile);
+    return pickFrom(this.discardPile) || pickFrom(this.drawPile);
   }
 
   checkModified(): boolean {

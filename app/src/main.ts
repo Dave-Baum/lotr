@@ -199,6 +199,20 @@ defineNotify('shuffle_n', m => {
   update();
 });
 
+definePost('play_discards_p', m => {
+  // TODO: Add an ability to explicitly play a card from the discard pile.
+  while (true) {
+    const id = deck.peekDiscard();
+    if (!id) {
+      break;
+    }
+    // This relies on the fact that deck.pick() checks discards before
+    // the draw pile.
+    submitMessage({kind: 'play', uid: 0, id});
+  }
+  update();
+});
+
 function update() {
   updateDeck();
 
@@ -242,14 +256,7 @@ putBottomButton.addEventListener('click', () => {
 });
 
 showDiscardButton.addEventListener('click', () => {
-  while (true) {
-    const id = deck.popDiscard();
-    if (!id) {
-      break;
-    }
-    playmat.play(nextUid++, id, playmat.getPlayPoint(), false);
-  }
-  update();
+  submitMessage({kind: 'play_discards_p'});
 });
 
 getElement('help-button').addEventListener('click', () => {

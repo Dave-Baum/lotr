@@ -22388,6 +22388,10 @@ define("app/src/deck", ["require", "exports"], function (require, exports) {
                 }
             }
         }
+        peekDiscard() {
+            const n = this.discardPile.length;
+            return n ? this.discardPile[n - 1] : undefined;
+        }
         pick(id) {
             const pickFrom = (pile) => {
                 const i = pile.indexOf(id);
@@ -22399,7 +22403,7 @@ define("app/src/deck", ["require", "exports"], function (require, exports) {
                 return true;
             };
             this.modified = true;
-            return pickFrom(this.drawPile) || pickFrom(this.discardPile);
+            return pickFrom(this.discardPile) || pickFrom(this.drawPile);
         }
         checkModified() {
             const old = this.modified;
@@ -23143,6 +23147,19 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
         deck.setState(m.deck);
         update();
     });
+    definePost('play_discards_p', m => {
+        // TODO: Add an ability to explicitly play a card from the discard pile.
+        while (true) {
+            const id = deck.peekDiscard();
+            if (!id) {
+                break;
+            }
+            // This relies on the fact that deck.pick() checks discards before
+            // the draw pile.
+            submitMessage({ kind: 'play', uid: 0, id });
+        }
+        update();
+    });
     function update() {
         updateDeck();
         revealButton.disabled = deck.drawCount() === 0;
@@ -23177,14 +23194,7 @@ define("app/src/main", ["require", "exports", "socket.io-client", "app/src/commo
         removeCard('bottom');
     });
     showDiscardButton.addEventListener('click', () => {
-        while (true) {
-            const id = deck.popDiscard();
-            if (!id) {
-                break;
-            }
-            playmat.play(nextUid++, id, playmat.getPlayPoint(), false);
-        }
-        update();
+        submitMessage({ kind: 'play_discards_p' });
     });
     (0, util_8.getElement)('help-button').addEventListener('click', () => {
         help.classList.remove('hide');
